@@ -43,6 +43,14 @@ th { position: sticky; top: 0; background: var(--mist); color: var(--navy); font
 td.num, th.num { text-align: right; }
 tbody tr:hover { background: #f7faff; }
 tfoot td { font-weight: 600; background: var(--mist); }
+
+/* Pinned left columns: deal number + customer stay put while the table scrolls sideways. */
+.pin { position: sticky; z-index: 1; background: var(--bg); }
+.pin-num { left: 0; width: 56px; min-width: 56px; max-width: 56px; }
+.pin-name { left: 56px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; box-shadow: 1px 0 0 var(--line), 6px 0 8px -6px rgba(5, 44, 111, 0.18); }
+thead th.pin { z-index: 3; background: var(--mist); }
+tfoot td.pin { background: var(--mist); }
+tbody tr:hover .pin { background: #f7faff; }
 .customer { font-weight: 500; }
 .muted { color: var(--muted); }
 .neg { color: var(--red); }

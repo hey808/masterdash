@@ -91,8 +91,8 @@ export default async function LedgerPage({ searchParams }: { searchParams: { vie
         <table>
           <thead>
             <tr>
-              <th>#</th>
-              <th>Customer</th>
+              <th className="pin pin-num">#</th>
+              <th className="pin pin-name">Customer</th>
               <th>Location</th>
               <th>Closer</th>
               <th>Sold</th>
@@ -115,8 +115,8 @@ export default async function LedgerPage({ searchParams }: { searchParams: { vie
           <tbody>
             {rows.map((r) => (
               <tr key={r.id}>
-                <td className="muted">{r.number}</td>
-                <td className="customer">{r.customerName}</td>
+                <td className="pin pin-num muted">{r.number}</td>
+                <td className="pin pin-name customer" title={r.customerName}>{r.customerName}</td>
                 <td>{r.location === "myrtle-beach" ? "Myrtle Beach" : "Wilmington"}</td>
                 <td>{r.closer?.name ?? "—"}</td>
                 <td>{shortDate(r.saleDate)}</td>
@@ -140,7 +140,8 @@ export default async function LedgerPage({ searchParams }: { searchParams: { vie
           {rows.length > 0 && (
             <tfoot>
               <tr>
-                <td colSpan={8}>{rows.length} deals</td>
+                <td className="pin pin-num" colSpan={2}>{rows.length} deals</td>
+                <td colSpan={6} />
                 <td className="num">{fmt(sumCents(rows.map((r) => r.priceCents)))}</td>
                 <td className="num">{fmt(sumCents(rows.map((r) => r.feesCents)))}</td>
                 <td className="num">{fmt(sumCents(rows.map((r) => r.netRevenueCents)))}</td>
