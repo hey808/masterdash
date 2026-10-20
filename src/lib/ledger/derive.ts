@@ -79,7 +79,8 @@ export function derive(d: Deal, asOf: string): DerivedDeal {
 
   const position = (kind: PayoutKind, person: Person | null, earned: Cents): PayoutPosition => {
     const paid = sumCents(d.payouts.filter((p) => p.kind === kind).map((p) => p.amountCents));
-    const waitingOn = kind === "installer" ? (isInstalled ? null : "install not done") : waitingForMoney;
+    // Nothing is paid out until the install is done AND the money is collected (Cade, 2026-10-20).
+    const waitingOn = [isInstalled ? null : "install not done", waitingForMoney].filter(Boolean).join("; ") || null;
     return { kind, person, earnedCents: earned, paidCents: paid, openCents: earned - paid, payable: waitingOn == null, waitingOn };
   };
   const payoutPositions = [

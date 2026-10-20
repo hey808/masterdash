@@ -200,7 +200,7 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
           {flash} <button type="button" className="linkbtn" onClick={() => setFlash(null)}>Dismiss</button>
         </p>
       )}
-      <div className="tablewrap">
+      <div className="tablewrap ledger-scroll">
         <table>
           <thead>
             <tr>

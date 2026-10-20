@@ -8,7 +8,7 @@ const VIEWS = [
   ["all", "All"],
   ["open", "Owed"],
   ["payable", "Payable now"],
-  ["waiting", "Waiting on money or install"],
+  ["waiting", "Waiting on install or money"],
   ["paid", "Paid"],
 ] as const;
 type View = (typeof VIEWS)[number][0];
@@ -78,7 +78,7 @@ export default async function AllCommissions({ searchParams }: { searchParams: {
         ))}
       </nav>
       <p className="table-bar">
-        Calculated from the Deal Ledger. Sales commissions become payable once the customer has paid and the lender has funded; installer pay once the install is done.
+        Calculated from the Deal Ledger. Every payout becomes payable once the install is done and the money is collected in full (customer paid and lender funded).
       </p>
 
       <div className="tablewrap">

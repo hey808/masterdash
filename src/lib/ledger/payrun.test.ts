@@ -27,11 +27,12 @@ describe("pay week", () => {
 });
 
 describe("pay run", () => {
-  it("money in by Thursday midnight makes the commission due this Friday, flagged new", () => {
+  it("installed earlier + paid in full by Thursday midnight: due this Friday", () => {
     const run = buildPayRun([deal({ payments: [pay("2026-10-22")] })], "2026-10-23");
     const closer = run.lines.find((l) => l.kind === "closer")!;
     expect(closer.isNew).toBe(true);
-    expect(closer.unlockedBy).toBe("customer paid 2026-10-22");
+    expect(closer.unlockedBy).toBe("customer paid in full 2026-10-22");
+    expect(run.lines.find((l) => l.kind === "installer")).toBeDefined(); // installer waits for the money too
     expect(run.collections).toHaveLength(1);
     expect(run.collections[0]!.completesDeal).toBe(true);
     expect(run.totals.collectedCents).toBe(749500);
@@ -44,11 +45,22 @@ describe("pay run", () => {
     expect(run.collections).toHaveLength(0);
   });
 
-  it("unpaid from earlier weeks carries over, not new", () => {
+  it("no carryovers: something payable in an earlier week isn't in this run", () => {
     const run = buildPayRun([deal({ payments: [pay("2026-10-08")] })], "2026-10-23");
+    expect(run.lines).toHaveLength(0);
+    expect(run.totals.dueCents).toBe(0);
+  });
+
+  it("paid in full earlier, installed this week: due this Friday", () => {
+    const run = buildPayRun([deal({ installedOn: "2026-10-19", payments: [pay("2026-10-08")] })], "2026-10-23");
     const closer = run.lines.find((l) => l.kind === "closer")!;
-    expect(closer.isNew).toBe(false);
-    expect(run.totals.carriedOverCents).toBeGreaterThan(0);
+    expect(closer.unlockedBy).toBe("installed 2026-10-19");
+  });
+
+  it("paid in full but not installed by the cutoff: waiting, not due", () => {
+    const run = buildPayRun([deal({ installedOn: null, payments: [pay("2026-10-20")] })], "2026-10-23");
+    expect(run.lines).toHaveLength(0);
+    expect(run.waiting.find((w) => w.kind === "closer")!.waitingOn).toBe("install not done");
   });
 
   it("a payout recorded on Friday counts as paid in this run and leaves nothing remaining", () => {
@@ -60,21 +72,15 @@ describe("pay run", () => {
     expect(closer.payoutIds).toEqual(["x"]);
   });
 
-  it("paid in an earlier run drops off this run", () => {
-    const d = deal({ payments: [pay("2026-10-08")], payouts: [{ id: "x", kind: "closer", personId: "b", amountCents: 108675, paidOn: "2026-10-16" }] });
-    expect(buildPayRun([d], "2026-10-23").lines.find((l) => l.kind === "closer")).toBeUndefined();
+  it("installer pay also waits for the money", () => {
+    const run = buildPayRun([deal({ installedOn: "2026-10-19" })], "2026-10-23");
+    expect(run.lines.find((l) => l.kind === "installer")).toBeUndefined();
+    expect(run.waiting.find((w) => w.kind === "installer")!.waitingOn).toMatch(/customer owes/);
   });
 
-  it("installer pay is due once the install is done by the cutoff", () => {
-    const later = buildPayRun([deal({ installedOn: "2026-10-23" })], "2026-10-23");
-    expect(later.lines.find((l) => l.kind === "installer")).toBeUndefined();
-    const inWeek = buildPayRun([deal({ installedOn: "2026-10-19" })], "2026-10-23");
-    expect(inWeek.lines.find((l) => l.kind === "installer")!.unlockedBy).toBe("installed 2026-10-19");
-  });
-
-  it("undated (imported) money counts as already in", () => {
+  it("undated (imported) money counts as already in, so those deals never land in a run", () => {
     const run = buildPayRun([deal({ payments: [pay(null)] })], "2026-10-23");
-    expect(run.lines.find((l) => l.kind === "closer")!.isNew).toBe(false);
+    expect(run.lines).toHaveLength(0);
     expect(run.undatedPayments).toBe(1);
   });
 });

@@ -111,8 +111,7 @@ export default function PayRunView({ run, today, currentPayDate }: { run: PayRun
 
       <section className="run-totals">
         <Stat label="Collected this week" value={fmt(totals.collectedCents)} note={`${run.collections.length} payment${run.collections.length === 1 ? "" : "s"}`} />
-        <Stat label="Newly payable" value={fmt(totals.newlyPayableCents)} note="money came in this week" tone="new" />
-        <Stat label="Carried over" value={fmt(totals.carriedOverCents)} note="payable before, still unpaid" tone="carry" />
+        <Stat label="Payable this week" value={fmt(totals.newlyPayableCents)} note="installed and paid in full by Thursday" tone="new" />
         <Stat label="Paid this run" value={fmt(totals.paidThisRunCents)} tone="paid" />
         <Stat label="Left to pay" value={fmt(totals.remainingCents)} tone={totals.remainingCents > 0 ? "due" : "paid"} big />
       </section>
@@ -120,8 +119,8 @@ export default function PayRunView({ run, today, currentPayDate }: { run: PayRun
       {error && <p className="flash" role="alert">{error}</p>}
       {(run.undatedPayments > 0 || run.undatedPayouts > 0) && (
         <p className="hint block">
-          {run.undatedPayments} payments and {run.undatedPayouts} payouts were imported from Mission Control without dates. They count as having happened before this
-          run, so older balances show as carried over. Set real dates from the ledger (click a Collected amount) to place them in the right week.
+          {run.undatedPayments} payments imported from Mission Control have no date, so those deals count as collected before this run and won't appear in it.
+          If one of them was really collected this week, set its date from the ledger (click the Collected amount).
         </p>
       )}
 
@@ -144,7 +143,7 @@ export default function PayRunView({ run, today, currentPayDate }: { run: PayRun
                 <th>#</th>
                 <th>Customer</th>
                 <th>For</th>
-                <th>Why it's due</th>
+                <th>Completed</th>
                 <th className="num">Due</th>
                 <th className="num">Paid</th>
                 <th />
@@ -196,8 +195,7 @@ export default function PayRunView({ run, today, currentPayDate }: { run: PayRun
                         </td>
                         <td>{KIND_LABEL[l.kind]}</td>
                         <td>
-                          {l.isNew ? <span className="status payable">New this week</span> : <span className="status waiting">Carried over</span>}
-                          {l.unlockedBy && <span className="muted"> {l.unlockedBy}</span>}
+                          {l.isNew ? <span className="muted">{l.unlockedBy}</span> : <span className="muted">paid this run (owed from an earlier week)</span>}
                         </td>
                         <td className="num">{money2(l.dueCents)}</td>
                         <td className="num">{l.paidThisRunCents ? money2(l.paidThisRunCents) : "—"}</td>
@@ -271,7 +269,7 @@ export default function PayRunView({ run, today, currentPayDate }: { run: PayRun
 
       <details className="waiting">
         <summary>
-          Still waiting: {fmt(totals.waitingCents)} across {run.waiting.length} line{run.waiting.length === 1 ? "" : "s"} (money not in or install not done by the cutoff)
+          Still waiting: {fmt(totals.waitingCents)} across {run.waiting.length} line{run.waiting.length === 1 ? "" : "s"} (not installed or not paid in full by the cutoff)
         </summary>
         <div className="tablewrap">
           <table>

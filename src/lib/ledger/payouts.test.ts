@@ -19,11 +19,11 @@ const base: Deal = {
 const paidIn = { source: "customer" as const, method: "check", amountCents: 749500, feeCents: 0, receivedOn: "2026-10-05" };
 
 describe("commissions payable", () => {
-  it("payable once the money is in; waiting with a reason until then", () => {
+  it("payable once installed and paid in full; waiting with a reason until then", () => {
     const waiting = payoutLines([derive(base, "2026-10-20")]);
     expect(waiting.find((l) => l.kind === "closer")!.status).toBe("waiting");
     expect(waiting.find((l) => l.kind === "closer")!.waitingOn).toMatch(/customer owes/);
-    expect(waiting.find((l) => l.kind === "installer")!.status).toBe("payable"); // installed
+    expect(waiting.find((l) => l.kind === "installer")!.status).toBe("waiting"); // installed, but money not in
 
     const paid = payoutLines([derive({ ...base, payments: [paidIn] }, "2026-10-20")]);
     expect(paid.find((l) => l.kind === "closer")!.status).toBe("payable");

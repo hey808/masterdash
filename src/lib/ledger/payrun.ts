@@ -1,11 +1,12 @@
 /**
  * The Friday pay run.
  *
- * Commissions are paid every Friday. A pay run on Friday F covers money
- * collected from the previous Friday (F − 7) through Thursday (F − 1); the
- * cutoff is Thursday at midnight, Eastern. A sales commission is due in a
- * run once the deal's money is in by that cutoff; installer pay once the
- * install is done by it. Payouts recorded F through F + 6 belong to run F.
+ * Commissions are paid every Friday. A pay run on Friday F covers the
+ * previous Friday (F − 7) through Thursday (F − 1); the cutoff is Thursday
+ * at midnight, Eastern. A payout is owed once the install is done AND the
+ * money is collected. A run pays exactly the lines that crossed that line
+ * during its week: no carryovers (Cade, 2026-10-20). Payouts recorded
+ * F through F + 6 belong to run F.
  *
  * Pure: stored Deals in, the run out. Dates are yyyy-mm-dd strings in ET.
  */
@@ -57,9 +58,9 @@ export interface RunLine {
   paidThisRunCents: Cents;
   /** dueCents − paidThisRunCents. */
   remainingCents: Cents;
-  /** Became payable this week (wasn't payable at last week's cutoff). */
+  /** Always true for lines owed in this run; false only for a payout recorded in this run against an older line. */
   isNew: boolean;
-  /** Why it's payable now, for new lines: the payment or install that unlocked it. */
+  /** What completed it this week: the install or the payment that finished the money. */
   unlockedBy: string | null;
   payoutIds: string[]; // payouts recorded in this run, for undo
 }
@@ -92,7 +93,6 @@ export interface PayRun {
   totals: {
     collectedCents: Cents;
     newlyPayableCents: Cents;
-    carriedOverCents: Cents;
     dueCents: Cents;
     paidThisRunCents: Cents;
     remainingCents: Cents;
@@ -151,6 +151,7 @@ export function buildPayRun(deals: Deal[], payDate: string): PayRun {
       }
       const prevPos = before.payoutPositions.find((x) => x.kind === pos.kind);
       const isNew = !prevPos || !prevPos.payable;
+      if (!isNew) continue; // no carryovers: only what became payable this week
       const runPayouts = d.payouts.filter((p) => p.kind === pos.kind && within(p.paidOn, week.payDate, week.runEnd));
       const paidThisRun = sumCents(runPayouts.map((p) => p.amountCents));
       const lastIn = inWeek.at(-1);
@@ -166,13 +167,10 @@ export function buildPayRun(deals: Deal[], payDate: string): PayRun {
         paidThisRunCents: paidThisRun,
         remainingCents: pos.openCents - paidThisRun,
         isNew,
-        unlockedBy: !isNew
-          ? null
-          : pos.kind === "installer"
-            ? `installed ${d.installedOn}`
-            : lastIn
-              ? `${lastIn.source === "lender" ? (d.lender ?? "lender") + " funded" : "customer paid"} ${lastIn.receivedOn}`
-              : "money in",
+        unlockedBy:
+          lastIn && (!d.installedOn || d.installedOn <= lastIn.receivedOn!)
+            ? `${lastIn.source === "lender" ? (d.lender ?? "lender") + " funded" : "customer paid in full"} ${lastIn.receivedOn}`
+            : `installed ${d.installedOn}`,
         payoutIds: runPayouts.map((p) => p.id).filter((x): x is string => !!x),
       });
     }
@@ -204,7 +202,6 @@ export function buildPayRun(deals: Deal[], payDate: string): PayRun {
     totals: {
       collectedCents: sumCents(collections.map((c) => c.payment.amountCents)),
       newlyPayableCents: total(lines.filter((l) => l.isNew), (l) => l.dueCents),
-      carriedOverCents: total(lines.filter((l) => !l.isNew), (l) => l.dueCents),
       dueCents: total(lines, (l) => l.dueCents),
       paidThisRunCents: total(lines, (l) => l.paidThisRunCents),
       remainingCents: total(lines, (l) => Math.max(0, l.remainingCents)),

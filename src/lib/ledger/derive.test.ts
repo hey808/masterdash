@@ -139,13 +139,19 @@ describe("derive: what the new ledger adds", () => {
     expect(closer.openCents).toBe(104183 - 50000);
   });
 
-  it("sales comp is not payable until the money is in; installer pay waits for the install", () => {
-    const d = derive(deal(), AS_OF);
-    const closer = d.payoutPositions.find((p) => p.kind === "closer")!;
-    const inst = d.payoutPositions.find((p) => p.kind === "installer")!;
-    expect(closer.payable).toBe(false);
-    expect(closer.waitingOn).toMatch(/ISPC has not funded/);
-    expect(inst.waitingOn).toBe("install not done");
+  it("nothing is payable until the install is done and the money is collected", () => {
+    const paid = { source: "lender" as const, method: "lender", amountCents: 719550, feeCents: 0, receivedOn: "2026-09-30" };
+    const notInstalled = derive(deal({ payments: [paid] }), AS_OF).payoutPositions;
+    expect(notInstalled.every((p) => !p.payable && p.waitingOn === "install not done")).toBe(true);
+
+    const notPaid = derive(deal({ installedOn: "2026-09-20" }), AS_OF).payoutPositions;
+    expect(notPaid.every((p) => !p.payable && /ISPC has not funded/.test(p.waitingOn!))).toBe(true);
+
+    const neither = derive(deal(), AS_OF).payoutPositions.find((p) => p.kind === "closer")!;
+    expect(neither.waitingOn).toMatch(/^install not done; ISPC has not funded/);
+
+    const both = derive(deal({ installedOn: "2026-09-20", payments: [paid] }), AS_OF).payoutPositions;
+    expect(both.every((p) => p.payable)).toBe(true);
   });
 
   it("flags the problems the old ledger let through", () => {
