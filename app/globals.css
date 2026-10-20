@@ -46,8 +46,8 @@ tfoot td { font-weight: 600; background: var(--mist); }
 
 /* Pinned left columns: deal number + customer stay put while the table scrolls sideways. */
 .pin { position: sticky; z-index: 1; background: var(--bg); }
-.pin-num { left: 0; width: 56px; min-width: 56px; max-width: 56px; }
-.pin-name { left: 56px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; box-shadow: 1px 0 0 var(--line), 6px 0 8px -6px rgba(5, 44, 111, 0.18); }
+.pin-num { left: 0; }
+.pin-name { max-width: 240px; overflow: hidden; text-overflow: ellipsis; box-shadow: 1px 0 0 var(--line), 6px 0 8px -6px rgba(5, 44, 111, 0.18); }
 thead th.pin { z-index: 3; background: var(--mist); }
 tfoot td.pin { background: var(--mist); }
 tbody tr:hover .pin { background: #f7faff; }
@@ -71,3 +71,16 @@ tbody tr:hover .pin { background: #f7faff; }
 .login input:focus-visible, .login button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .login button { padding: 10px 12px; border: 0; border-radius: 6px; background: var(--navy); color: #fff; font: 600 14px var(--font-body); cursor: pointer; }
 .login .error { margin: 0; padding: 8px 12px; }
+
+/* Collapsible columns */
+.th-inner { display: inline-flex; align-items: center; gap: 6px; }
+th.num .th-inner { flex-direction: row-reverse; }
+.colbtn { border: 0; background: transparent; color: var(--muted); font: 600 13px var(--font-body); line-height: 1; padding: 2px 4px; border-radius: 4px; cursor: pointer; opacity: 0; }
+th:hover .colbtn, .colbtn:focus-visible, .col-collapsed .colbtn { opacity: 1; }
+.colbtn:hover { background: var(--line); color: var(--navy); }
+.colbtn:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+th.col-collapsed, td.col-collapsed { width: 28px; min-width: 28px; max-width: 28px; padding: 7px 0; text-align: center; background-image: repeating-linear-gradient(0deg, transparent 0 6px, var(--mist) 6px 7px); }
+th.col-collapsed { background-image: none; }
+.collapsed-note { margin: 0 0 8px; color: var(--muted); font-size: 13px; }
+.linkbtn { border: 0; background: none; padding: 0; color: var(--blue); font: inherit; cursor: pointer; text-decoration: underline; }
+@media (hover: none) { .colbtn { opacity: 1; } }

@@ -3,7 +3,8 @@ import { SETTLED_CENTS } from "@/lib/ledger/derive";
 import { loadLedger } from "@/lib/ledger/repo";
 import { totals } from "@/lib/ledger/rollups";
 import type { DerivedDeal } from "@/lib/ledger/types";
-import { fmt, sumCents } from "@/lib/money";
+import { fmt } from "@/lib/money";
+import LedgerTable from "./LedgerTable";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +58,6 @@ export default async function LedgerPage({ searchParams }: { searchParams: { vie
   const t = totals(scoped, asOf);
   const rows = applyView(scoped, view);
   const href = (v: string, l: string) => `/ledger?${new URLSearchParams({ ...(v !== "all" ? { view: v } : {}), ...(l ? { loc: l } : {}) })}`;
-  const open = (r: DerivedDeal) => sumCents(r.payoutPositions.map((p) => Math.max(0, p.openCents)));
 
   return (
     <>
@@ -87,77 +87,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: { vie
         ))}
       </nav>
 
-      <div className="tablewrap">
-        <table>
-          <thead>
-            <tr>
-              <th className="pin pin-num">#</th>
-              <th className="pin pin-name">Customer</th>
-              <th>Location</th>
-              <th>Closer</th>
-              <th>Sold</th>
-              <th>Installed</th>
-              <th>Stage</th>
-              <th>Products</th>
-              <th className="num">Price</th>
-              <th className="num">Fees</th>
-              <th className="num">Net revenue</th>
-              <th className="num">Collected</th>
-              <th className="num">Customer owes</th>
-              <th className="num">Lender owes</th>
-              <th className="num">Payouts open</th>
-              <th className="num">Cost of goods</th>
-              <th className="num">Net profit</th>
-              <th className="num">Margin</th>
-              <th>Issues</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id}>
-                <td className="pin pin-num muted">{r.number}</td>
-                <td className="pin pin-name customer" title={r.customerName}>{r.customerName}</td>
-                <td>{r.location === "myrtle-beach" ? "Myrtle Beach" : "Wilmington"}</td>
-                <td>{r.closer?.name ?? "—"}</td>
-                <td>{shortDate(r.saleDate)}</td>
-                <td>{r.installedOn ? shortDate(r.installedOn) : <span className="muted">{r.installScheduledOn ? `sched ${shortDate(r.installScheduledOn)}` : "—"}</span>}</td>
-                <td><span className={`stage ${r.stage}`}>{r.stage}</span></td>
-                <td>{r.lines.map((l) => (l.qty > 1 ? `${l.qty}× ${l.skuCode}` : l.skuCode)).join(" + ") || <span className="muted">none</span>}</td>
-                <td className="num">{fmt(r.priceCents)}</td>
-                <td className="num">{fmt(r.feesCents)}</td>
-                <td className="num">{fmt(r.netRevenueCents)}</td>
-                <td className="num">{fmt(r.collectedCents)}</td>
-                <td className={`num ${r.cashDueCents < 0 ? "neg" : ""}`}>{fmt(r.cashDueCents)}</td>
-                <td className={`num ${r.fundingDueCents < 0 ? "neg" : ""}`}>{fmt(r.fundingDueCents)}</td>
-                <td className="num">{fmt(open(r))}</td>
-                <td className="num">{fmt(r.cogsCents)}</td>
-                <td className={`num ${(r.netProfitCents ?? 0) < 0 ? "neg" : ""}`}>{fmt(r.netProfitCents)}</td>
-                <td className="num">{r.margin == null ? "—" : `${(r.margin * 100).toFixed(1)}%`}</td>
-                <td className="issues">{r.issues.join(" · ")}</td>
-              </tr>
-            ))}
-          </tbody>
-          {rows.length > 0 && (
-            <tfoot>
-              <tr>
-                <td className="pin pin-num" colSpan={2}>{rows.length} deals</td>
-                <td colSpan={6} />
-                <td className="num">{fmt(sumCents(rows.map((r) => r.priceCents)))}</td>
-                <td className="num">{fmt(sumCents(rows.map((r) => r.feesCents)))}</td>
-                <td className="num">{fmt(sumCents(rows.map((r) => r.netRevenueCents)))}</td>
-                <td className="num">{fmt(sumCents(rows.map((r) => r.collectedCents)))}</td>
-                <td className="num">{fmt(sumCents(rows.map((r) => Math.max(0, r.cashDueCents))))}</td>
-                <td className="num">{fmt(sumCents(rows.map((r) => Math.max(0, r.fundingDueCents))))}</td>
-                <td className="num">{fmt(sumCents(rows.map(open)))}</td>
-                <td className="num">{fmt(sumCents(rows.map((r) => r.cogsCents ?? 0)))}</td>
-                <td className="num">{fmt(sumCents(rows.map((r) => r.netProfitCents ?? 0)))}</td>
-                <td colSpan={2} />
-              </tr>
-            </tfoot>
-          )}
-        </table>
-        {rows.length === 0 && <p className="empty">No deals in this view.</p>}
-      </div>
+      <LedgerTable rows={rows} />
     </>
   );
 }
