@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import Modal from "../Modal";
+import PaymentsModal from "./PaymentsModal";
 import { shortDate } from "@/lib/dates";
 import { FIELDS, parseMoneyInput, parseRateInput, type FieldDef, type FieldKey } from "@/lib/ledger/fields";
 import type { LedgerOptions } from "@/lib/ledger/options";
@@ -117,6 +119,9 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
   const [rows, setRows] = useState(initial);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [flash, setFlash] = useState<string | null>(null);
+  const [paymentsFor, setPaymentsFor] = useState<string | null>(null);
+  const closePayments = useCallback(() => setPaymentsFor(null), []);
+  const replaceRow = useCallback((d: DerivedDeal) => setRows((rs) => rs.map((r) => (r.id === d.id ? d : r))), []);
 
   useEffect(() => setRows(initial), [initial]);
 
@@ -184,7 +189,7 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
   return (
     <>
       <div className="table-bar">
-        <span className="legend">White cells: click to edit. Shaded cells are calculated.</span>
+        <span className="legend">White cells: click to edit. Shaded cells are calculated. Click a Collected amount to record a payment.</span>
         {collapsed.size > 0 && (
           <span>
             {collapsed.size} column{collapsed.size > 1 ? "s" : ""} collapsed.{" "}
@@ -229,6 +234,15 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
                   const p = pin(c.key);
                   const base = `${c.num ? "num" : ""} ${p.cls}`;
                   if (isC) return <td key={c.key} className={`${base} col-collapsed`} style={p.style} />;
+                  if (c.key === "collected") {
+                    return (
+                      <td key={c.key} className={`${base} calc action`} style={p.style}>
+                        <button type="button" className="cellbtn" onClick={() => setPaymentsFor(r.id)} title="See and record payments">
+                          {c.cell(r)}
+                        </button>
+                      </td>
+                    );
+                  }
                   if (!c.field) {
                     return (
                       <td key={c.key} className={`${base} calc ${c.cellClass?.(r) ?? ""}`} style={p.style}>
@@ -271,6 +285,9 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
         </table>
         {rows.length === 0 && <p className="empty">No deals in this view.</p>}
       </div>
+      {paymentsFor && rows.find((r) => r.id === paymentsFor) && (
+        <PaymentsModal deal={rows.find((r) => r.id === paymentsFor)!} onClose={closePayments} onDeal={replaceRow} />
+      )}
     </>
   );
 }
@@ -313,7 +330,7 @@ function EditableCell(props: {
 
   return (
     <td
-      className={`${className} editable ${editing ? "is-editing" : ""} ${saving ? "saving" : ""} ${error ? "cell-error" : ""}`}
+      className={`${className} editable ${editing && kind !== "products" ? "is-editing" : ""} ${saving ? "saving" : ""} ${error ? "cell-error" : ""}`}
       style={style}
       title={error ?? (field === "customerName" ? row.customerName : undefined)}
       tabIndex={editing ? -1 : 0}
@@ -325,7 +342,18 @@ function EditableCell(props: {
         }
       }}
     >
-      {editing ? <Editor kind={kind} field={field} row={row} options={options} onCommit={commit} onCancel={() => setEditing(false)} /> : display}
+      {editing && kind === "products" ? (
+        <>
+          {display}
+          <Modal title={`Products: ${row.customerName}`} onClose={() => setEditing(false)}>
+            <ProductsEditor initial={rawValue(row, field) as Array<{ skuCode: string; qty: number }>} skus={options.skus} onCommit={commit} onCancel={() => setEditing(false)} />
+          </Modal>
+        </>
+      ) : editing ? (
+        <Editor kind={kind} field={field} row={row} options={options} onCommit={commit} onCancel={() => setEditing(false)} />
+      ) : (
+        display
+      )}
     </td>
   );
 }
@@ -426,7 +454,6 @@ function Editor(props: {
     );
   }
 
-  if (kind === "products") return <ProductsEditor initial={raw as Array<{ skuCode: string; qty: number }>} skus={options.skus} onCommit={onCommit} onCancel={onCancel} />;
   return null;
 }
 
@@ -439,7 +466,7 @@ function ProductsEditor(props: {
   const [qty, setQty] = useState<Record<string, number>>(() => Object.fromEntries(props.initial.map((l) => [l.skuCode, l.qty])));
   const lines = () => props.skus.filter((s) => (qty[s.code] ?? 0) > 0).map((s) => ({ skuCode: s.code, qty: qty[s.code]! }));
   return (
-    <div className="products-editor" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === "Escape" && props.onCancel()}>
+    <div className="products-editor" onClick={(e) => e.stopPropagation()}>
       {props.skus.map((s, i) => (
         <label key={s.code} title={s.name}>
           <input
@@ -463,7 +490,7 @@ function ProductsEditor(props: {
         </label>
       ))}
       <div className="products-actions">
-        <button type="button" className="btn-primary" onClick={() => props.onCommit(lines())}>Save</button>
+        <button type="button" className="btn-primary" onClick={() => props.onCommit(lines())}>Save products</button>
         <button type="button" className="linkbtn" onClick={props.onCancel}>Cancel</button>
       </div>
     </div>

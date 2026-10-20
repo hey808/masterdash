@@ -15,6 +15,8 @@ export interface DealLine {
 }
 
 export interface Payment {
+  /** Row id; absent only in hand-built test fixtures. */
+  id?: string;
   source: "customer" | "lender";
   method: string;
   amountCents: Cents;
@@ -23,6 +25,7 @@ export interface Payment {
 }
 
 export interface Payout {
+  id?: string;
   kind: PayoutKind;
   personId: string | null;
   amountCents: Cents;

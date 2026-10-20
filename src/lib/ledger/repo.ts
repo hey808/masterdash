@@ -18,10 +18,10 @@ select d.*,
   (select jsonb_build_object('id', p.id, 'name', p.name) from people p where p.id = d.installer_id) as installer,
   coalesce((select jsonb_agg(jsonb_build_object('skuCode', x.sku_code, 'qty', x.qty, 'unitCostCents', x.unit_cost_cents) order by x.sort)
             from deal_lines x where x.deal_id = d.id), '[]') as lines,
-  coalesce((select jsonb_agg(jsonb_build_object('source', x.source, 'method', x.method, 'amountCents', x.amount_cents,
+  coalesce((select jsonb_agg(jsonb_build_object('id', x.id, 'source', x.source, 'method', x.method, 'amountCents', x.amount_cents,
                                                 'feeCents', x.fee_cents, 'receivedOn', x.received_on) order by x.received_on nulls first)
             from payments x where x.deal_id = d.id), '[]') as payments,
-  coalesce((select jsonb_agg(jsonb_build_object('kind', x.kind, 'personId', x.person_id, 'amountCents', x.amount_cents,
+  coalesce((select jsonb_agg(jsonb_build_object('id', x.id, 'kind', x.kind, 'personId', x.person_id, 'amountCents', x.amount_cents,
                                                 'paidOn', x.paid_on) order by x.paid_on nulls first)
             from payouts x where x.deal_id = d.id), '[]') as payouts
 from deals d
