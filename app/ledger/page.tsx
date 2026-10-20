@@ -1,5 +1,6 @@
 import { todayET } from "@/lib/dates";
 import { SETTLED_CENTS } from "@/lib/ledger/derive";
+import { loadOptions, type LedgerOptions } from "@/lib/ledger/options";
 import { loadLedger } from "@/lib/ledger/repo";
 import type { DerivedDeal } from "@/lib/ledger/types";
 import LedgerTable from "./LedgerTable";
@@ -42,8 +43,9 @@ export default async function LedgerPage({ searchParams }: { searchParams: { vie
   const loc = LOCATIONS.find(([k]) => k === searchParams.loc)?.[0] ?? "";
 
   let all: DerivedDeal[];
+  let options: LedgerOptions;
   try {
-    all = await loadLedger(asOf);
+    [all, options] = await Promise.all([loadLedger(asOf), loadOptions()]);
   } catch (e) {
     return (
       <>
@@ -69,7 +71,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: { vie
         ))}
       </nav>
 
-      <LedgerTable rows={rows} />
+      <LedgerTable rows={rows} options={options} />
     </>
   );
 }

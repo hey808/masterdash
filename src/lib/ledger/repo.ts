@@ -26,8 +26,8 @@ select d.*,
             from payouts x where x.deal_id = d.id), '[]') as payouts
 from deals d
 join locations l on l.id = d.location_id
-left join lenders le on le.id = d.lender_id
-order by d.sale_date desc, d.number desc`;
+left join lenders le on le.id = d.lender_id`;
+const ORDER = " order by d.sale_date desc, d.number desc";
 
 type Row = Record<string, unknown>;
 const s = (v: unknown) => (v == null ? null : String(v));
@@ -38,6 +38,7 @@ export function rowToDeal(r: Row): Deal {
   return {
     id: String(r.id),
     number: Number(r.number),
+    version: Number(r.version),
     location: String(r.location_slug),
     customerName: String(r.customer_name),
     customerAddress: s(r.customer_address),
@@ -80,8 +81,13 @@ export function rowToDeal(r: Row): Deal {
 }
 
 export async function loadDeals(client: pg.Pool | pg.PoolClient = db()): Promise<Deal[]> {
-  const { rows } = await client.query(LEDGER_SQL);
+  const { rows } = await client.query(LEDGER_SQL + ORDER);
   return rows.map(rowToDeal);
+}
+
+export async function loadDeal(id: string, client: pg.Pool | pg.PoolClient = db()): Promise<Deal | null> {
+  const { rows } = await client.query(LEDGER_SQL + " where d.id = $1", [id]);
+  return rows[0] ? rowToDeal(rows[0]) : null;
 }
 
 export async function loadLedger(asOf: string, client?: pg.Pool | pg.PoolClient): Promise<DerivedDeal[]> {

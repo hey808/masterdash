@@ -33,6 +33,8 @@ export interface Payout {
 export interface Deal {
   id: string;
   number: number;
+  /** Row version for optimistic concurrency; bumps on every write. */
+  version: number;
   location: string; // location slug
   customerName: string;
   customerAddress: string | null;

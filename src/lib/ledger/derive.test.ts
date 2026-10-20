@@ -12,6 +12,7 @@ function deal(over: Partial<Deal> = {}): Deal {
   return {
     id: "d1",
     number: 1001,
+    version: 1,
     location: "wilmington",
     customerName: "Test Customer",
     customerAddress: null,

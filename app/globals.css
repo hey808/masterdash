@@ -81,6 +81,26 @@ th:hover .colbtn, .colbtn:focus-visible, .col-collapsed .colbtn { opacity: 1; }
 .colbtn:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
 th.col-collapsed, td.col-collapsed { width: 28px; min-width: 28px; max-width: 28px; padding: 7px 0; text-align: center; background-image: repeating-linear-gradient(0deg, transparent 0 6px, var(--mist) 6px 7px); }
 th.col-collapsed { background-image: none; }
-.collapsed-note { margin: 0 0 8px; color: var(--muted); font-size: 13px; }
 .linkbtn { border: 0; background: none; padding: 0; color: var(--blue); font: inherit; cursor: pointer; text-decoration: underline; }
 @media (hover: none) { .colbtn { opacity: 1; } }
+
+/* Editable vs calculated cells */
+td.calc { background: #f7f9fc; color: #3c4a63; }
+td.editable { cursor: text; }
+td.editable:hover { box-shadow: inset 0 0 0 1px var(--blue); }
+td.editable:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+td.is-editing { padding: 2px 4px; box-shadow: inset 0 0 0 2px var(--blue); }
+td.saving { opacity: 0.55; }
+td.cell-error { box-shadow: inset 0 0 0 2px var(--red); }
+td.center { text-align: center; }
+td.wrap { white-space: normal; min-width: 220px; }
+.cell-input { width: 100%; min-width: 110px; padding: 4px 6px; border: 0; background: #fff; font: inherit; color: var(--ink); outline: none; }
+.cell-input.num { text-align: right; font-variant-numeric: tabular-nums; }
+.products-editor { display: grid; gap: 4px; padding: 6px; min-width: 200px; white-space: nowrap; }
+.products-editor label { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.products-editor .qty { width: 46px; padding: 2px 4px; border: 1px solid var(--line); border-radius: 4px; font: inherit; }
+.products-actions { display: flex; gap: 10px; align-items: center; margin-top: 4px; }
+.btn-primary { padding: 4px 12px; border: 0; border-radius: 5px; background: var(--navy); color: #fff; font: 600 13px var(--font-body); cursor: pointer; }
+.table-bar { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin: 0 0 8px; color: var(--muted); font-size: 13px; }
+.legend { display: inline-flex; align-items: center; gap: 6px; }
+.flash { margin: 0 0 8px; padding: 8px 12px; border: 1px solid var(--red); border-radius: 6px; color: var(--red); font-size: 13px; }
