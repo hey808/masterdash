@@ -18,6 +18,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 var(
 a { color: var(--blue); text-decoration: none; }
 .topbar { display: flex; align-items: center; gap: 32px; padding: 14px 24px; background: var(--navy); color: #fff; }
 .brand { font: 800 15px var(--font-display); letter-spacing: 0.12em; }
+.topbar nav { display: flex; gap: 22px; }
 .topbar nav a { color: #c9d8f2; font-weight: 500; }
 .topbar nav a.active { color: #fff; }
 main { padding: 24px; max-width: 1600px; }
@@ -104,3 +105,18 @@ td.wrap { white-space: normal; min-width: 220px; }
 .table-bar { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin: 0 0 8px; color: var(--muted); font-size: 13px; }
 .legend { display: inline-flex; align-items: center; gap: 6px; }
 .flash { margin: 0 0 8px; padding: 8px 12px; border: 1px solid var(--red); border-radius: 6px; color: var(--red); font-size: 13px; }
+
+/* Commissions payable */
+.payables .person-row td { border-bottom: 0; }
+.payables .person-row .strong { font-weight: 700; color: var(--navy); }
+.payables .detail-row > td { padding: 0 10px 10px; }
+.payables details summary { cursor: pointer; color: var(--blue); font-size: 13px; padding: 2px 0; }
+.payables details[open] summary { margin-bottom: 6px; }
+.payables table.lines { border: 1px solid var(--line); border-radius: 6px; }
+.payables table.lines th { position: static; background: #f7f9fc; font-weight: 600; }
+.payables table.lines td, .payables table.lines th { padding: 5px 8px; font-size: 13px; }
+.status { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+.status.payable { background: #e3f6ec; color: var(--ok); }
+.status.waiting { background: #fff4e0; color: var(--warn); }
+.status.paid { background: #eceff4; color: var(--muted); }
+.status.overpaid { background: #fde8eb; color: var(--red); }

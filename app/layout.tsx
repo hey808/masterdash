@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import Nav from "./Nav";
 
 export const metadata: Metadata = { title: "Clearflow", description: "Clear Flow Water USA operating system" };
 
@@ -13,9 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <header className="topbar">
           <span className="brand">CLEAR FLOW</span>
-          <nav>
-            <a href="/ledger" className="active">Ledger</a>
-          </nav>
+          <Nav />
         </header>
         <main>{children}</main>
       </body>
