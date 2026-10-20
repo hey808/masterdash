@@ -1,0 +1,21 @@
+name: Apply migrations
+# Runs supabase/migrations/*.sql against production on every push to main.
+# Needs the repo secret SUPABASE_DB_URL (Supabase > Project Settings > Database >
+# Connection string > "Session pooler" URI, with the password filled in).
+on:
+  push:
+    branches: [main]
+    paths: ["supabase/migrations/**"]
+  workflow_dispatch:
+concurrency: { group: migrate, cancel-in-progress: false }
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
