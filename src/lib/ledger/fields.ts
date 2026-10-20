@@ -42,6 +42,7 @@ export const FIELDS = {
   installerPayCents: { kind: "money", label: "Installer pay", column: "installer_pay_cents" },
   installScheduledOn: { kind: "date", label: "Install scheduled", column: "install_scheduled_on" },
   installedOn: { kind: "date", label: "Installed", column: "installed_on" },
+  installed: { kind: "bool", label: "Installed" },
   closed: { kind: "bool", label: "Done" },
   note: { kind: "text", label: "Note", column: "note" },
 } as const satisfies Record<string, FieldDef>;

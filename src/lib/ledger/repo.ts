@@ -27,7 +27,7 @@ select d.*,
 from deals d
 join locations l on l.id = d.location_id
 left join lenders le on le.id = d.lender_id`;
-const ORDER = " order by d.sale_date desc, d.number desc";
+const ORDER = " order by d.number";
 
 type Row = Record<string, unknown>;
 const s = (v: unknown) => (v == null ? null : String(v));

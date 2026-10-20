@@ -35,48 +35,56 @@ const LOCATION_NAME: Record<string, string> = { wilmington: "Wilmington", "myrtl
 const productsText = (lines: DealLine[]) => lines.map((l) => (l.qty > 1 ? `${l.qty}× ${l.skuCode}` : l.skuCode)).join(" + ");
 
 const COLUMNS: Col[] = [
-  { key: "number", label: "#", cell: (r) => r.number, cellClass: () => "muted" },
+  { key: "number", label: "#", fixed: true, cell: (r) => r.number, cellClass: () => "muted" },
+  { key: "stage", label: "Stage", fixed: true, cell: (r) => <span className={`stage ${r.stage}`}>{r.stage}</span> },
   { key: "customer", label: "Customer", fixed: true, field: "customerName", cell: (r) => r.customerName, cellClass: () => "customer" },
   { key: "address", label: "Address", field: "customerAddress", cell: (r) => r.customerAddress ?? "" },
   { key: "location", label: "Location", field: "location", cell: (r) => LOCATION_NAME[r.location] ?? r.location },
-  { key: "leadSource", label: "Lead source", field: "leadSource", cell: (r) => r.leadSource ?? "" },
+  { key: "leadSource", label: "Lead Source", field: "leadSource", cell: (r) => r.leadSource ?? "" },
   { key: "closer", label: "Closer", field: "closer", cell: (r) => r.closer?.name ?? "" },
   { key: "setter", label: "Setter", field: "setter", cell: (r) => r.setter?.name ?? "" },
   { key: "manager", label: "Manager", field: "manager", cell: (r) => r.manager?.name ?? "" },
-  { key: "sold", label: "Sold", field: "saleDate", cell: (r) => shortDate(r.saleDate) },
+  { key: "sold", label: "Sold Date", field: "saleDate", cell: (r) => shortDate(r.saleDate) },
   { key: "products", label: "Products", field: "products", cell: (r) => productsText(r.lines) || <span className="muted">none</span> },
   { key: "price", label: "Price", field: "priceCents", ...money((r) => r.priceCents) },
-  { key: "cash", label: "Cash portion", field: "cashPortionCents", ...money((r) => r.cashPortionCents) },
+  { key: "cash", label: "Cash Portion", field: "cashPortionCents", ...money((r) => r.cashPortionCents) },
   { key: "financed", label: "Financed", field: "financedPortionCents", ...money((r) => r.financedPortionCents) },
   { key: "lender", label: "Lender", field: "lender", cell: (r) => r.lender ?? "" },
-  { key: "lenderRate", label: "Lender fee %", field: "lenderRate", num: true, cell: (r) => fmtRate(r.lenderRate) },
+  { key: "lenderRate", label: "Lender Fee %", field: "lenderRate", num: true, cell: (r) => fmtRate(r.lenderRate) },
   { key: "fees", label: "Fees", ...money((r) => r.feesCents) },
-  { key: "net", label: "Net revenue", ...money((r) => r.netRevenueCents) },
-  { key: "collected", label: "Collected", ...money((r) => r.collectedCents) },
-  { key: "custOwes", label: "Customer owes", ...money((r) => r.cashDueCents, (r) => Math.max(0, r.cashDueCents)), cellClass: (r) => (r.cashDueCents < 0 ? "neg" : "") },
-  { key: "lenderOwes", label: "Lender owes", ...money((r) => r.fundingDueCents, (r) => Math.max(0, r.fundingDueCents)), cellClass: (r) => (r.fundingDueCents < 0 ? "neg" : "") },
+  { key: "net", label: "Net Revenue", ...money((r) => r.netRevenueCents) },
+  { key: "collectedCustomer", label: "Collected - Customer", ...money((r) => r.cashCollectedCents) },
+  { key: "custOwes", label: "Customer Owes", ...money((r) => r.cashDueCents, (r) => Math.max(0, r.cashDueCents)), cellClass: (r) => (r.cashDueCents < 0 ? "neg" : "") },
+  { key: "collectedLender", label: "Collected - Lender", ...money((r) => r.fundedCents) },
+  { key: "lenderOwes", label: "Lender Owes", ...money((r) => r.fundingDueCents, (r) => Math.max(0, r.fundingDueCents)), cellClass: (r) => (r.fundingDueCents < 0 ? "neg" : "") },
   { key: "commissionRate", label: "Commission %", field: "commissionRate", num: true, cell: (r) => fmtRate(r.commissionRate) },
   { key: "managerRate", label: "Override %", field: "managerRate", num: true, cell: (r) => fmtRate(r.managerRate) },
-  { key: "adminFee", label: "Admin fee", field: "adminFeeCents", ...money((r) => r.adminFeeCents) },
+  { key: "adminFee", label: "Admin Fee", field: "adminFeeCents", ...money((r) => r.adminFeeCents) },
   { key: "extras", label: "Extras", field: "extrasCents", ...money((r) => r.extrasCents) },
-  { key: "payouts", label: "Payouts open", ...money(openPayouts) },
+  { key: "payouts", label: "Payouts Open", ...money(openPayouts) },
   { key: "installer", label: "Installer", field: "installer", cell: (r) => r.installer?.name ?? "" },
-  { key: "installerPay", label: "Installer pay", field: "installerPayCents", ...money((r) => r.installerPayCents) },
-  { key: "scheduled", label: "Install scheduled", field: "installScheduledOn", cell: (r) => (r.installScheduledOn ? shortDate(r.installScheduledOn) : "") },
-  { key: "installed", label: "Installed", field: "installedOn", cell: (r) => (r.installedOn ? shortDate(r.installedOn) : "") },
-  { key: "stage", label: "Stage", cell: (r) => <span className={`stage ${r.stage}`}>{r.stage}</span> },
-  { key: "cogs", label: "Cost of goods", ...money((r) => r.cogsCents) },
-  { key: "profit", label: "Net profit", ...money((r) => r.netProfitCents), cellClass: (r) => ((r.netProfitCents ?? 0) < 0 ? "neg" : "") },
+  { key: "installerPay", label: "Installer Pay", field: "installerPayCents", ...money((r) => r.installerPayCents) },
+  { key: "scheduled", label: "Install Schedule", field: "installScheduledOn", cell: (r) => (r.installScheduledOn ? shortDate(r.installScheduledOn) : "") },
+  { key: "installed", label: "Installed", field: "installed", cell: (r) => (r.installedOn ? "Yes" : "No") },
+  { key: "cogs", label: "Cost of Goods", ...money((r) => r.cogsCents) },
+  { key: "profit", label: "Net Profit", ...money((r) => r.netProfitCents), cellClass: (r) => ((r.netProfitCents ?? 0) < 0 ? "neg" : "") },
   { key: "margin", label: "Margin", num: true, cell: (r) => (r.margin == null ? "—" : `${(r.margin * 100).toFixed(1)}%`) },
   { key: "done", label: "Done", field: "closed", cell: (r) => (r.closedAt ? "✓" : "") },
   { key: "note", label: "Note", field: "note", cell: (r) => r.note ?? "", cellClass: () => "wrap" },
   { key: "issues", label: "Issues", cell: (r) => r.issues.join(" · "), cellClass: () => "issues" },
 ];
 
-/** Less-used typed columns start collapsed for a new browser. */
-const DEFAULT_COLLAPSED = ["address", "leadSource", "manager", "setter", "lenderRate", "managerRate", "adminFee", "extras", "note"];
-const STORAGE_KEY = "ledger.collapsedColumns.v2";
+/** Column views. Each view starts from its preset; tweaks are remembered per view in this browser. */
+const CONSOLIDATED = ["location", "sold", "price", "cash", "financed", "fees", "collectedCustomer", "custOwes", "scheduled", "installed", "profit"];
+const VIEWS = {
+  consolidated: { label: "Consolidated", collapsed: COLUMNS.filter((c) => !c.fixed && !CONSOLIDATED.includes(c.key)).map((c) => c.key) },
+  all: { label: "All Deals", collapsed: [] as string[] },
+} as const;
+type ViewKey = keyof typeof VIEWS;
+const DEFAULT_VIEW: ViewKey = "consolidated";
+const viewStorage = (v: ViewKey) => `ledger.view.${v}.collapsed`;
 const NUM_W = 56;
+const STAGE_W = 104;
 const COLLAPSED_W = 28;
 
 /** The stored value behind a typed field, as the editor starts from it. */
@@ -94,6 +102,7 @@ function rawValue(r: DerivedDeal, f: FieldKey): unknown {
     case "saleDate": return r.saleDate;
     case "installScheduledOn": return r.installScheduledOn ?? "";
     case "installedOn": return r.installedOn ?? "";
+    case "installed": return r.installedOn != null;
     case "products": return r.lines.map((l) => ({ skuCode: l.skuCode, qty: l.qty }));
     case "priceCents": return r.priceCents;
     case "cashPortionCents": return r.cashPortionCents;
@@ -115,27 +124,48 @@ type SaveResult = string | null; // error message, or null on success
 
 export default function LedgerTable({ rows: initial, options }: { rows: DerivedDeal[]; options: LedgerOptions }) {
   const [rows, setRows] = useState(initial);
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [view, setView] = useState<ViewKey>(DEFAULT_VIEW);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set(VIEWS[DEFAULT_VIEW].collapsed));
   const [flash, setFlash] = useState<string | null>(null);
-  const [paymentsFor, setPaymentsFor] = useState<string | null>(null);
+  const [paymentsFor, setPaymentsFor] = useState<{ id: string; source: "customer" | "lender" } | null>(null);
   const closePayments = useCallback(() => setPaymentsFor(null), []);
   const replaceRow = useCallback((d: DerivedDeal) => setRows((rs) => rs.map((r) => (r.id === d.id ? d : r))), []);
 
   useEffect(() => setRows(initial), [initial]);
 
-  useEffect(() => {
+  const loadView = (v: ViewKey) => {
+    let next = new Set<string>(VIEWS[v].collapsed);
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      const saved = raw == null ? DEFAULT_COLLAPSED : JSON.parse(raw);
-      if (Array.isArray(saved)) setCollapsed(new Set(saved.filter((k) => COLUMNS.some((c) => c.key === k && !c.fixed))));
+      const raw = localStorage.getItem(viewStorage(v));
+      const saved = raw == null ? null : JSON.parse(raw);
+      if (Array.isArray(saved)) next = new Set(saved.filter((k) => COLUMNS.some((c) => c.key === k && !c.fixed)));
     } catch {
-      setCollapsed(new Set(DEFAULT_COLLAPSED));
+      /* storage unavailable: use the preset */
     }
+    setView(v);
+    setCollapsed(next);
+    try {
+      localStorage.setItem("ledger.view", v);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  useEffect(() => {
+    let v: ViewKey = DEFAULT_VIEW;
+    try {
+      const saved = localStorage.getItem("ledger.view");
+      if (saved && saved in VIEWS) v = saved as ViewKey;
+    } catch {
+      /* ignore */
+    }
+    loadView(v);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const persist = (next: Set<string>) => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]));
+      localStorage.setItem(viewStorage(view), JSON.stringify([...next]));
     } catch {
       /* storage unavailable */
     }
@@ -148,11 +178,15 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
       persist(next);
       return next;
     });
-  const expandAll = () => {
-    const next = new Set<string>();
-    setCollapsed(next);
-    persist(next);
+  const resetView = () => {
+    try {
+      localStorage.removeItem(viewStorage(view));
+    } catch {
+      /* ignore */
+    }
+    setCollapsed(new Set(VIEWS[view].collapsed));
   };
+  const customized = [...collapsed].sort().join() !== [...VIEWS[view].collapsed].sort().join();
 
   async function save(row: DerivedDeal, field: FieldKey, value: unknown): Promise<SaveResult> {
     try {
@@ -176,24 +210,31 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
     }
   }
 
-  const numWidth = collapsed.has("number") ? COLLAPSED_W : NUM_W;
   const pin = (key: string) =>
     key === "number"
-      ? { cls: "pin pin-num", style: { left: 0, width: numWidth, minWidth: numWidth, maxWidth: numWidth } }
-      : key === "customer"
-        ? { cls: "pin pin-name", style: { left: numWidth } }
-        : { cls: "", style: {} };
+      ? { cls: "pin pin-num", style: { left: 0, width: NUM_W, minWidth: NUM_W, maxWidth: NUM_W } }
+      : key === "stage"
+        ? { cls: "pin pin-stage", style: { left: NUM_W, width: STAGE_W, minWidth: STAGE_W, maxWidth: STAGE_W } }
+        : key === "customer"
+          ? { cls: "pin pin-name", style: { left: NUM_W + STAGE_W } }
+          : { cls: "", style: {} };
 
   return (
     <>
       <div className="table-bar">
-        <span className="legend">White cells: click to edit. Shaded cells are calculated. Click a Collected amount to record a payment.</span>
-        {collapsed.size > 0 && (
-          <span>
-            {collapsed.size} column{collapsed.size > 1 ? "s" : ""} collapsed.{" "}
-            <button type="button" className="linkbtn" onClick={expandAll}>Show all columns</button>
-          </span>
+        <nav className="filters views" aria-label="Column view">
+          {(Object.keys(VIEWS) as ViewKey[]).map((v) => (
+            <button key={v} type="button" className={v === view ? "on" : ""} aria-pressed={v === view} onClick={() => loadView(v)}>
+              {VIEWS[v].label}
+            </button>
+          ))}
+        </nav>
+        {customized && (
+          <button type="button" className="linkbtn" onClick={resetView}>
+            Reset {VIEWS[view].label} columns
+          </button>
         )}
+        <span className="legend">White cells: click to edit. Shaded cells are calculated. Click a Collected amount to record a payment.</span>
       </div>
       {flash && (
         <p className="flash" role="alert">
@@ -232,10 +273,11 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
                   const p = pin(c.key);
                   const base = `${c.num ? "num" : ""} ${p.cls}`;
                   if (isC) return <td key={c.key} className={`${base} col-collapsed`} style={p.style} />;
-                  if (c.key === "collected") {
+                  if (c.key === "collectedCustomer" || c.key === "collectedLender") {
+                    const source = c.key === "collectedLender" ? "lender" : "customer";
                     return (
                       <td key={c.key} className={`${base} calc action`} style={p.style}>
-                        <button type="button" className="cellbtn" onClick={() => setPaymentsFor(r.id)} title="See and record payments">
+                        <button type="button" className="cellbtn" onClick={() => setPaymentsFor({ id: r.id, source })} title="See and record payments">
                           {c.cell(r)}
                         </button>
                       </td>
@@ -270,7 +312,7 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
                 {COLUMNS.map((c) => {
                   const isC = collapsed.has(c.key);
                   const p = pin(c.key);
-                  const content = isC ? null : c.key === "number" ? rows.length : c.key === "customer" ? "deals" : c.field && !c.num ? null : c.total?.(rows);
+                  const content = isC ? null : c.key === "number" ? rows.length : c.key === "stage" ? null : c.key === "customer" ? "deals" : c.field && !c.num ? null : c.total?.(rows);
                   return (
                     <td key={c.key} className={`${c.num ? "num" : ""} ${p.cls} ${isC ? "col-collapsed" : ""}`} style={p.style}>
                       {content}
@@ -283,8 +325,8 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
         </table>
         {rows.length === 0 && <p className="empty">No deals in this view.</p>}
       </div>
-      {paymentsFor && rows.find((r) => r.id === paymentsFor) && (
-        <PaymentsModal deal={rows.find((r) => r.id === paymentsFor)!} onClose={closePayments} onDeal={replaceRow} />
+      {paymentsFor && rows.find((r) => r.id === paymentsFor.id) && (
+        <PaymentsModal deal={rows.find((r) => r.id === paymentsFor.id)!} initialSource={paymentsFor.source} onClose={closePayments} onDeal={replaceRow} />
       )}
     </>
   );
@@ -316,12 +358,32 @@ function EditableCell(props: {
     setError(err);
   };
 
-  // Checkbox: one click toggles and saves.
+  // Yes/No: one click toggles and saves.
   if (kind === "bool") {
     const checked = rawValue(row, field) as boolean;
+    const label = FIELDS[field].label;
+    const tip = error ?? (field === "installed" && row.installedOn ? `Installed ${row.installedOn}` : undefined);
+    if (field === "installed") {
+      return (
+        <td className={`${className} editable ${saving ? "saving" : ""} ${error ? "cell-error" : ""}`} style={style} title={tip}>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={checked}
+            aria-label={`${label}: ${row.customerName}`}
+            className={`toggle ${checked ? "on" : ""}`}
+            disabled={saving}
+            onClick={() => commit(!checked)}
+          >
+            <span className="knob" />
+            <span className="toggle-text">{checked ? "Yes" : "No"}</span>
+          </button>
+        </td>
+      );
+    }
     return (
-      <td className={`${className} editable center ${saving ? "saving" : ""} ${error ? "cell-error" : ""}`} style={style} title={error ?? undefined}>
-        <input type="checkbox" aria-label={`Done: ${row.customerName}`} checked={checked} disabled={saving} onChange={(e) => commit(e.target.checked)} />
+      <td className={`${className} editable center ${saving ? "saving" : ""} ${error ? "cell-error" : ""}`} style={style} title={tip}>
+        <input type="checkbox" aria-label={`${label}: ${row.customerName}`} checked={checked} disabled={saving} onChange={(e) => commit(e.target.checked)} />
       </td>
     );
   }

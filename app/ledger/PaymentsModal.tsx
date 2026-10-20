@@ -8,10 +8,10 @@ import { fmt } from "@/lib/money";
 import Modal from "../Modal";
 
 /** Money in on one deal: every payment with its date, plus a form to record a new one. */
-export default function PaymentsModal({ deal, onClose, onDeal }: { deal: DerivedDeal; onClose: () => void; onDeal: (d: DerivedDeal) => void }) {
+export default function PaymentsModal({ deal, initialSource, onClose, onDeal }: { deal: DerivedDeal; initialSource?: "customer" | "lender"; onClose: () => void; onDeal: (d: DerivedDeal) => void }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [source, setSource] = useState<"customer" | "lender">(deal.cashDueCents > 50 || deal.financedPortionCents === 0 ? "customer" : "lender");
+  const [source, setSource] = useState<"customer" | "lender">(initialSource ?? (deal.cashDueCents > 50 || deal.financedPortionCents === 0 ? "customer" : "lender"));
   const suggested = source === "customer" ? Math.max(0, deal.cashDueCents) : Math.max(0, deal.fundingDueCents);
 
   async function call(url: string, method: string, payload?: unknown) {

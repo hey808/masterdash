@@ -134,6 +134,10 @@ export async function applyEdit(
       }
 
       case "bool":
+        if (key === "installed") {
+          // Yes stamps today's date (Eastern) unless an install date is already set; No clears it.
+          return set("installed_on = case when $2::boolean then coalesce(installed_on, $3::date) else null end", [v, todayET()]);
+        }
         return set("closed_at = case when $2::boolean then coalesce(closed_at, now()) else null end", [v]);
     }
   }
