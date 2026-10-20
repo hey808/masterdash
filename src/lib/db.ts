@@ -9,11 +9,23 @@ pg.types.setTypeParser(1082, (v) => v);
 
 let pool: pg.Pool | null = null;
 
+/** DATABASE_URL, or POSTGRES_URL as synced by the Supabase ↔ Vercel integration. */
+export function databaseUrl(): string | undefined {
+  return process.env.DATABASE_URL || process.env.POSTGRES_URL;
+}
+
 export function db(): pg.Pool {
   if (!pool) {
-    const url = process.env.DATABASE_URL;
-    if (!url) throw new Error("DATABASE_URL is not set");
-    pool = new pg.Pool({ connectionString: url, max: 5 });
+    const raw = databaseUrl();
+    if (!raw) throw new Error("DATABASE_URL is not set");
+    const url = new URL(raw);
+    const local = ["localhost", "127.0.0.1"].includes(url.hostname);
+    // Supabase's pooler presents a certificate not in Node's default CA store.
+    // Keep TLS on, skip chain verification; drop sslmode so pg doesn't override this.
+    url.searchParams.delete("sslmode");
+    url.searchParams.delete("supa");
+    url.searchParams.delete("pgbouncer");
+    pool = new pg.Pool({ connectionString: url.toString(), max: 5, ssl: local ? undefined : { rejectUnauthorized: false } });
   }
   return pool;
 }
