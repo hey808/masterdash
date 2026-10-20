@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { KIND_LABEL } from "@/lib/ledger/payouts";
 import { addDays, type PayRun, type RunLine } from "@/lib/ledger/payrun";
 import { fmt, sumCents } from "@/lib/money";
@@ -17,6 +17,31 @@ export default function PayRunView({ run, today, currentPayDate }: { run: PayRun
   const { week, totals } = run;
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Everyone starts collapsed; the browser remembers who you've opened.
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("payrun.open") ?? "[]");
+      if (Array.isArray(saved)) setOpen(new Set(saved));
+    } catch {
+      /* storage unavailable: everyone stays collapsed */
+    }
+  }, []);
+  const saveOpen = (next: Set<string>) => {
+    setOpen(next);
+    try {
+      localStorage.setItem("payrun.open", JSON.stringify([...next]));
+    } catch {
+      /* ignore */
+    }
+  };
+  const folded = { has: (person: string) => !open.has(person) };
+  const toggleFold = (person: string) => {
+    const next = new Set(open);
+    if (next.has(person)) next.delete(person);
+    else next.add(person);
+    saveOpen(next);
+  };
 
   // A payout belongs to the run it is recorded for: never before Friday, never past the run.
   const paidOn = today < week.payDate ? week.payDate : today > week.runEnd ? week.runEnd : today;
@@ -100,7 +125,15 @@ export default function PayRunView({ run, today, currentPayDate }: { run: PayRun
         </p>
       )}
 
-      <h2 className="section">To pay this Friday</h2>
+      <div className="section-head">
+        <h2 className="section">To pay this Friday</h2>
+        {people.length > 1 && (
+          <span className="fold-all">
+            <button type="button" className="linkbtn" onClick={() => saveOpen(new Set(people.map(([p]) => p)))}>Expand all</button>
+            <button type="button" className="linkbtn" onClick={() => saveOpen(new Set())}>Collapse all</button>
+          </span>
+        )}
+      </div>
       {people.length === 0 ? (
         <p className="empty">Nothing is payable in this run.</p>
       ) : (
@@ -125,7 +158,16 @@ export default function PayRunView({ run, today, currentPayDate }: { run: PayRun
                 <tbody key={person}>
                   <tr className="person-head">
                     <td colSpan={4}>
-                      <strong>{person}</strong>{" "}
+                      <button
+                        type="button"
+                        className="fold"
+                        aria-expanded={!folded.has(person)}
+                        aria-label={`${folded.has(person) ? "Show" : "Hide"} ${person}'s lines`}
+                        onClick={() => toggleFold(person)}
+                      >
+                        {folded.has(person) ? "▸" : "▾"}
+                      </button>
+                      <strong className="fold-name" onClick={() => toggleFold(person)}>{person}</strong>{" "}
                       <span className="muted">
                         {lines.length} line{lines.length === 1 ? "" : "s"} · due {money2(due)}
                         {paid > 0 && ` · paid ${money2(paid)}`}
@@ -135,14 +177,15 @@ export default function PayRunView({ run, today, currentPayDate }: { run: PayRun
                       {remaining > 0 ? <strong className="due">{money2(remaining)} to pay</strong> : <span className="status paid">All paid</span>}
                     </td>
                     <td>
-                      {remaining > 0 && (
+                      {remaining > 0 && person === "Unassigned" && <span className="hint">Name the person on each deal in the ledger to pay</span>}
+                      {remaining > 0 && person !== "Unassigned" && (
                         <button type="button" className="btn-primary" disabled={busy != null} onClick={() => pay(lines, `all-${person}`)}>
                           {busy === `all-${person}` ? "Recording…" : `Pay all ${money2(remaining)}`}
                         </button>
                       )}
                     </td>
                   </tr>
-                  {lines.map((l) => {
+                  {!folded.has(person) && lines.map((l) => {
                     const key = `${l.dealId}-${l.kind}`;
                     const done = l.remainingCents <= 50;
                     return (
@@ -168,6 +211,8 @@ export default function PayRunView({ run, today, currentPayDate }: { run: PayRun
                                 </button>
                               )}
                             </span>
+                          ) : l.personId == null ? (
+                            <span className="muted">No person on deal</span>
                           ) : (
                             <button type="button" className="btn-outline" disabled={busy != null} onClick={() => pay([l], key)}>
                               {busy === key ? "Recording…" : "Mark paid"}

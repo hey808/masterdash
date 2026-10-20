@@ -187,3 +187,10 @@ table.run .due { color: var(--red); }
 .small { font-size: 12px; margin: 6px 0 0; }
 details.waiting { margin-top: 22px; }
 details.waiting summary { cursor: pointer; color: var(--navy); font-weight: 600; margin-bottom: 8px; }
+
+.section-head { display: flex; align-items: baseline; gap: 16px; }
+.fold-all { display: inline-flex; gap: 12px; font-size: 13px; }
+.fold { border: 0; background: none; width: 22px; padding: 0; margin-right: 4px; color: var(--navy); font-size: 13px; cursor: pointer; border-radius: 4px; }
+.fold:hover { background: #dde7f6; }
+.fold:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+.fold-name { cursor: pointer; }

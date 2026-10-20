@@ -37,7 +37,6 @@ export const FIELDS = {
   lenderRate: { kind: "rate", label: "Lender fee %", column: "lender_rate", required: true },
   commissionRate: { kind: "rate", label: "Commission %", column: "commission_rate", required: true },
   managerRate: { kind: "rate", label: "Override %", column: "manager_rate", required: true },
-  setterRate: { kind: "rate", label: "Setter %", column: "setter_rate", required: true },
   adminFeeCents: { kind: "money", label: "Admin fee", column: "admin_fee_cents", required: true },
   extrasCents: { kind: "money", label: "Extras", column: "extras_cents", required: true },
   installerPayCents: { kind: "money", label: "Installer pay", column: "installer_pay_cents" },

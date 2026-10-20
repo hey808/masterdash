@@ -57,7 +57,6 @@ const COLUMNS: Col[] = [
   { key: "lenderOwes", label: "Lender owes", ...money((r) => r.fundingDueCents, (r) => Math.max(0, r.fundingDueCents)), cellClass: (r) => (r.fundingDueCents < 0 ? "neg" : "") },
   { key: "commissionRate", label: "Commission %", field: "commissionRate", num: true, cell: (r) => fmtRate(r.commissionRate) },
   { key: "managerRate", label: "Override %", field: "managerRate", num: true, cell: (r) => fmtRate(r.managerRate) },
-  { key: "setterRate", label: "Setter %", field: "setterRate", num: true, cell: (r) => fmtRate(r.setterRate) },
   { key: "adminFee", label: "Admin fee", field: "adminFeeCents", ...money((r) => r.adminFeeCents) },
   { key: "extras", label: "Extras", field: "extrasCents", ...money((r) => r.extrasCents) },
   { key: "payouts", label: "Payouts open", ...money(openPayouts) },
@@ -75,7 +74,7 @@ const COLUMNS: Col[] = [
 ];
 
 /** Less-used typed columns start collapsed for a new browser. */
-const DEFAULT_COLLAPSED = ["address", "leadSource", "manager", "setter", "lenderRate", "managerRate", "setterRate", "adminFee", "extras", "note"];
+const DEFAULT_COLLAPSED = ["address", "leadSource", "manager", "setter", "lenderRate", "managerRate", "adminFee", "extras", "note"];
 const STORAGE_KEY = "ledger.collapsedColumns.v2";
 const NUM_W = 56;
 const COLLAPSED_W = 28;
@@ -106,7 +105,6 @@ function rawValue(r: DerivedDeal, f: FieldKey): unknown {
     case "lenderRate": return r.lenderRate;
     case "commissionRate": return r.commissionRate;
     case "managerRate": return r.managerRate;
-    case "setterRate": return r.setterRate;
     case "closed": return r.closedAt != null;
   }
 }
