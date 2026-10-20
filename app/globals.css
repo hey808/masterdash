@@ -1,0 +1,57 @@
+/* Clear Flow Water USA brand: navy and white lead, blue carries energy, red is a controlled accent. */
+:root {
+  --navy: #052c6f;
+  --blue: #087dfc;
+  --red: #eb0d28;
+  --mist: #eef6ff;
+  --ink: #17233b;
+  --muted: #5b6b86;
+  --line: #d9e3f2;
+  --ok: #137a4a;
+  --warn: #a35b00;
+  --bg: #ffffff;
+  --font-display: "Montserrat", Arial, sans-serif;
+  --font-body: "Inter", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--font-body); }
+a { color: var(--blue); text-decoration: none; }
+.topbar { display: flex; align-items: center; gap: 32px; padding: 14px 24px; background: var(--navy); color: #fff; }
+.brand { font: 800 15px var(--font-display); letter-spacing: 0.12em; }
+.topbar nav a { color: #c9d8f2; font-weight: 500; }
+.topbar nav a.active { color: #fff; }
+main { padding: 24px; max-width: 1600px; }
+h1 { font: 800 24px var(--font-display); color: var(--navy); margin: 0 0 4px; }
+.sub { color: var(--muted); margin: 0 0 20px; }
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.kpi { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+.kpi .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+.kpi .value { font: 700 20px var(--font-display); color: var(--navy); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.kpi .note { color: var(--muted); font-size: 12px; }
+.kpi.alert .value { color: var(--red); }
+
+.filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; }
+.filters a { padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink); font-size: 13px; }
+.filters a.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+.filters .sep { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { padding: 7px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; text-align: left; }
+th { position: sticky; top: 0; background: var(--mist); color: var(--navy); font-size: 12px; font-weight: 600; }
+td.num, th.num { text-align: right; }
+tbody tr:hover { background: #f7faff; }
+tfoot td { font-weight: 600; background: var(--mist); }
+.customer { font-weight: 500; }
+.muted { color: var(--muted); }
+.neg { color: var(--red); }
+.stage { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+.stage.sold { background: #fff4e0; color: var(--warn); }
+.stage.installed { background: #e6f0ff; color: var(--blue); }
+.stage.collected { background: #e3f6ec; color: var(--ok); }
+.stage.closed { background: #eceff4; color: var(--muted); }
+.stage.cancelled { background: #fde8eb; color: var(--red); }
+.issues { color: var(--red); font-size: 12px; white-space: normal; min-width: 180px; }
+.empty { padding: 32px; text-align: center; color: var(--muted); }
+.error { border: 1px solid var(--red); color: var(--red); padding: 12px 16px; border-radius: 8px; }
