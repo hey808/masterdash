@@ -32,6 +32,46 @@ async function send(url: string, method: string, payload: unknown): Promise<stri
   }
 }
 
+interface BulkResult {
+  created: Array<{ name: string; email: string; role: "sales" | "installer"; password: string }>;
+  skipped: Array<{ name: string; reason: string }>;
+}
+
+function BulkCard({ r, onDone }: { r: BulkResult; onDone: () => void }) {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const text = r.created.map((c) => `${c.name}: sign in at ${origin}/login with ${c.email} / ${c.password}`).join("\n");
+  const [copied, setCopied] = useState(false);
+  return (
+    <section className="credential bulk">
+      <div className="bulk-head">
+        <strong>{r.created.length === 0 ? "No new logins" : `Created ${r.created.length} login${r.created.length === 1 ? "" : "s"}. Send each person theirs.`}</strong>
+        <span className="muted">These passwords won&apos;t be shown again.</span>
+      </div>
+      {r.created.length > 0 && (
+        <table>
+          <thead><tr><th>Name</th><th>Role</th><th>Email</th><th>Password</th></tr></thead>
+          <tbody>
+            {r.created.map((c) => (
+              <tr key={c.email}><td><strong>{c.name}</strong></td><td>{ROLE_LABEL[c.role]}</td><td>{c.email}</td><td><code>{c.password}</code></td></tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {r.skipped.length > 0 && (
+        <ul className="bulk-skipped">
+          {r.skipped.map((s) => <li key={s.name + s.reason}><strong>{s.name}</strong>: {s.reason}</li>)}
+        </ul>
+      )}
+      <div className="bulk-actions">
+        {r.created.length > 0 && (
+          <button type="button" className="btn-outline" onClick={() => void navigator.clipboard.writeText(text).then(() => setCopied(true))}>{copied ? "Copied" : "Copy all"}</button>
+        )}
+        <button type="button" className="linkbtn" onClick={onDone}>Done</button>
+      </div>
+    </section>
+  );
+}
+
 export default function TeamView({ users, people }: { users: AppUser[]; people: Array<{ id: string; name: string; roles: string[] }> }) {
   const router = useRouter();
   const [adding, setAdding] = useState(false);
@@ -39,13 +79,36 @@ export default function TeamView({ users, people }: { users: AppUser[]; people: 
   const [shown, setShown] = useState<{ email: string; password: string } | null>(null);
   const closeAdd = useCallback(() => setAdding(false), []);
   const closeEdit = useCallback(() => setEditing(null), []);
+  const [bulk, setBulk] = useState<BulkResult | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkError, setBulkError] = useState<string | null>(null);
+  const fromCalendar = async () => {
+    setBulkBusy(true);
+    setBulkError(null);
+    try {
+      const res = await fetch("/api/users/from-calendar", { method: "POST" });
+      const j = (await res.json().catch(() => ({}))) as BulkResult & { error?: string };
+      if (!res.ok) setBulkError(j.error ?? "Couldn't create the logins.");
+      else {
+        setBulk(j);
+        router.refresh();
+      }
+    } catch {
+      setBulkError("Couldn't reach the server.");
+    }
+    setBulkBusy(false);
+  };
 
   return (
     <>
       <div className="table-bar">
         <button type="button" className="btn-primary" onClick={() => setAdding(true)}>+ Add login</button>
+        <button type="button" className="btn-outline" disabled={bulkBusy} onClick={() => void fromCalendar()}>{bulkBusy ? "Creating…" : "Create logins from calendar"}</button>
         <span className="muted">Admins sign in with the owner password (leave email blank) until they have their own login.</span>
       </div>
+
+      {bulkError && <p className="flash" role="alert">{bulkError}</p>}
+      {bulk && <BulkCard r={bulk} onDone={() => setBulk(null)} />}
 
       {shown && (
         <div className="credential">

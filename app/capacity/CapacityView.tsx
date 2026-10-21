@@ -127,6 +127,7 @@ export default function CapacityView({ loc, weeks, weekIdx, people, ghlUsers, to
       </div>
 
       <h2 className="section">Team at {loc.name}</h2>
+      <p className="muted small team-note">Anyone assigned appointments on {loc.name}&apos;s GoHighLevel calendars is added here and matched to the roster automatically. Set how many each can take a week; turn off anyone who shouldn&apos;t count.</p>
       <Team loc={loc} w={w} week={week} ghlUsers={ghlUsers} ghlName={ghlName} people={people} act={act} busy={busy} />
 
       <h2 className="section">Settings</h2>
@@ -253,8 +254,12 @@ function MemberRow({ m, w, week, ghlUsers, ghlName, act, busy }: {
     void act({ action: "setWeek", id: m.id, week, slots: n === m.weeklySlots ? null : n });
   };
   return (
-    <tr className={m.active ? "" : "off"}>
-      <td><strong>{m.personName}</strong>{!m.active && <span className="muted"> (off)</span>}</td>
+    <tr className={!m.active ? "off" : m.weeklySlots === 0 ? "needs-slots" : ""}>
+      <td>
+        <strong>{m.personName}</strong>
+        {!m.active && <span className="muted"> (off)</span>}
+        {m.active && m.weeklySlots === 0 && <span className="set-slots">Set weekly slots</span>}
+      </td>
       <td>
         <select aria-label={`GoHighLevel user for ${m.personName}`} value={m.ghlUserId ?? ""} disabled={busy} onChange={(e) => void act({ action: "updateMember", id: m.id, ghlUserId: e.target.value || null })}>
           <option value="">Not matched</option>

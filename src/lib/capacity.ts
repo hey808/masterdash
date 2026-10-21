@@ -11,6 +11,7 @@
  */
 import { z } from "zod";
 import { db, tx } from "./db";
+import { matchRoster } from "./person-match";
 import { loadCalendar, type CalEvent, type GhlLocation } from "./ghl";
 import { EditError } from "./ledger/edit";
 import { addDays } from "./ledger/payrun";
@@ -202,6 +203,61 @@ export async function loadCapacity(today: string, firstWeek = mondayOf(today), w
       };
     });
   return { weeks, locations, problems: cal.problems };
+}
+
+/**
+ * Keep each location's team in step with its GoHighLevel calendars: everyone
+ * assigned an appointment in the last 60 days or the next 60 is matched to the
+ * roster by name and linked to their GHL user. Someone new is added with 0
+ * slots so their bookings count and the page asks for their slots. A link set
+ * by hand is never overwritten, and people turned off stay off.
+ */
+export async function syncCapacityMembers(today: string): Promise<{ added: number; linked: number }> {
+  const cal = await loadCalendar(`${addDays(today, -60)}T12:00:00Z`, `${addDays(today, 60)}T12:00:00Z`);
+  const seen = new Map<string, { slug: string; role: CapRole; ghlUserId: string; name: string }>();
+  for (const e of cal.events) {
+    if (!e.assignedUserId || !e.assignedTo || e.status === "invalid") continue;
+    seen.set(`${e.location}:${e.kind}:${e.assignedUserId}`, { slug: e.location, role: e.kind, ghlUserId: e.assignedUserId, name: e.assignedTo });
+  }
+  if (seen.size === 0) return { added: 0, linked: 0 };
+  try {
+    return await tx("sync:ghl-calendar", async (c) => {
+      const locs = new Map((await c.query("select id, slug from locations")).rows.map((r) => [r.slug as string, r.id as string]));
+      const roster = (await c.query("select id, name from people where active")).rows as Array<{ id: string; name: string }>;
+      const members = (await c.query("select id, location_id, person_id, role, ghl_user_id from capacity_members")).rows;
+      let added = 0;
+      let linked = 0;
+      for (const s of seen.values()) {
+        const locId = locs.get(s.slug);
+        if (!locId) continue;
+        // Already linked to this GHL user at this location and role (by hand or before)?
+        if (members.some((m) => m.location_id === locId && m.role === s.role && m.ghl_user_id === s.ghlUserId)) continue;
+        const { person } = matchRoster(s.name, roster);
+        if (!person) continue;
+        const cur = members.find((m) => m.location_id === locId && m.role === s.role && m.person_id === person.id);
+        if (cur) {
+          if (cur.ghl_user_id) continue; // linked by hand to someone else's GHL user: leave it
+          await c.query("update capacity_members set ghl_user_id = $2, updated_at = now() where id = $1", [cur.id, s.ghlUserId]);
+          cur.ghl_user_id = s.ghlUserId;
+          linked++;
+        } else {
+          const r = await c.query(
+            `insert into capacity_members (location_id, person_id, role, weekly_slots, ghl_user_id) values ($1,$2,$3,0,$4)
+             on conflict (location_id, person_id, role) do nothing returning id`,
+            [locId, person.id, s.role, s.ghlUserId],
+          );
+          if (r.rows[0]) {
+            members.push({ id: r.rows[0].id, location_id: locId, person_id: person.id, role: s.role, ghl_user_id: s.ghlUserId });
+            added++;
+          }
+        }
+      }
+      return { added, linked };
+    });
+  } catch (e) {
+    if ((e as { code?: string }).code === "42P01") return { added: 0, linked: 0 };
+    throw e;
+  }
 }
 
 /** Before the capacity tables exist, read as empty. */

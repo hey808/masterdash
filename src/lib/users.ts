@@ -3,7 +3,10 @@
  * that's how their commissions and their forms are scoped to them.
  */
 import { z } from "zod";
+import { randomInt } from "node:crypto";
 import { hashPassword } from "./auth";
+import type { CalendarPerson } from "./ghl";
+import { matchRoster } from "./person-match";
 import { db, tx } from "./db";
 import { EditError } from "./ledger/edit";
 import type { Role } from "./session";
@@ -107,4 +110,65 @@ export async function updateUser(id: string, input: unknown, actor: string): Pro
     if (UNIQUE(e)) throw new EditError("There's already a login with that email.", 409);
     throw e;
   }
+}
+
+/* ── Logins for everyone on the GoHighLevel calendars ─────────────────── */
+
+/** 12 characters, no look-alikes, grouped for reading out over the phone. */
+export function makePassword(): string {
+  const chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  return Array.from({ length: 12 }, () => chars[randomInt(chars.length)]).join("").replace(/(.{4})(?=.)/g, "$1-");
+}
+
+export interface Roster { id: string; name: string; email: string | null; roles: string[] }
+export type LoginPlan =
+  | { kind: "create"; ghl: CalendarPerson; person: Roster; role: "sales" | "installer"; email: string }
+  | { kind: "skip"; ghl: CalendarPerson; reason: string };
+
+/**
+ * Match each calendar person to one roster person: same full name, else the
+ * one roster person with the same first name (GHL has "Mike CF", the roster "Mike").
+ * Role: installer when they're only on installer calendars or the roster says
+ * installer; otherwise sales. Skips anyone already holding a login.
+ */
+export function planCalendarLogins(people: CalendarPerson[], roster: Roster[], existing: Array<{ email: string; personId: string | null }>): LoginPlan[] {
+  const emails = new Set(existing.map((e) => e.email.toLowerCase()));
+  const persons = new Set(existing.map((e) => e.personId).filter(Boolean));
+  const taken = new Set<string>();
+  return people.map((g): LoginPlan => {
+    const m = matchRoster(g.name, roster);
+    if (!m.person && m.ambiguous) return { kind: "skip", ghl: g, reason: `More than one roster person named ${g.name.split(" ")[0]}; add this login by hand` };
+    const person = m.person;
+    if (!person) return { kind: "skip", ghl: g, reason: "Not on the roster" };
+    const email = (g.email ?? person.email ?? "").toLowerCase();
+    if (!email) return { kind: "skip", ghl: g, reason: "No email in GoHighLevel" };
+    if (persons.has(person.id) || taken.has(person.id)) return { kind: "skip", ghl: g, reason: `${person.name} already has a login` };
+    if (emails.has(email)) return { kind: "skip", ghl: g, reason: `${email} already has a login` };
+    taken.add(person.id);
+    const role = person.roles.includes("installer") || (g.install > 0 && g.sales === 0) ? "installer" : "sales";
+    return { kind: "create", ghl: g, person, role, email };
+  });
+}
+
+export interface CreatedLogin { name: string; email: string; role: "sales" | "installer"; password: string }
+
+export async function createCalendarLogins(people: CalendarPerson[], actor: string): Promise<{ created: CreatedLogin[]; skipped: Array<{ name: string; reason: string }> }> {
+  const [roster, existing] = await Promise.all([
+    db().query("select id, name, email, roles from people where active"),
+    db().query(`select email, person_id as "personId" from app_users`),
+  ]);
+  const plan = planCalendarLogins(people, roster.rows as Roster[], existing.rows);
+  const created: CreatedLogin[] = [];
+  const skipped = plan.filter((p) => p.kind === "skip").map((p) => ({ name: p.ghl.name, reason: (p as { reason: string }).reason }));
+  for (const p of plan) {
+    if (p.kind !== "create") continue;
+    const password = makePassword();
+    try {
+      await createUser({ name: p.person.name, email: p.email, role: p.role, personId: p.person.id, password }, actor);
+      created.push({ name: p.person.name, email: p.email, role: p.role, password });
+    } catch (e) {
+      skipped.push({ name: p.person.name, reason: e instanceof EditError ? e.message : "Couldn't create this one" });
+    }
+  }
+  return { created, skipped };
 }

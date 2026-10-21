@@ -73,15 +73,24 @@ const headers = (token: string, version: string) => ({ Authorization: `Bearer ${
 const etDay = (iso: string) =>
   new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
 
-export async function users(loc: GhlLocation, token: string): Promise<Map<string, string>> {
+export interface GhlUser { id: string; name: string; email: string | null }
+
+/** GoHighLevel users for a location, by id. */
+export async function userDetails(loc: GhlLocation, token: string): Promise<Map<string, GhlUser>> {
   try {
     const res = await fetch(`${API}/users/?locationId=${loc.locationId}`, { headers: headers(token, "2021-07-28"), next: { revalidate: 3600 } });
     if (!res.ok) return new Map();
-    const j = (await res.json()) as { users?: Array<{ id: string; name?: string; firstName?: string; lastName?: string }> };
-    return new Map((j.users ?? []).map((u) => [u.id, (u.name || `${u.firstName ?? ""} ${u.lastName ?? ""}`).trim()]));
+    const j = (await res.json()) as { users?: Array<{ id: string; name?: string; firstName?: string; lastName?: string; email?: string }> };
+    return new Map(
+      (j.users ?? []).map((u) => [u.id, { id: u.id, name: (u.name || `${u.firstName ?? ""} ${u.lastName ?? ""}`).trim(), email: u.email?.trim().toLowerCase() || null }]),
+    );
   } catch {
     return new Map();
   }
+}
+
+export async function users(loc: GhlLocation, token: string): Promise<Map<string, string>> {
+  return new Map([...(await userDetails(loc, token)).values()].map((u) => [u.id, u.name]));
 }
 
 /** GHL titles often carry a status prefix ("CONFIRMED: …", "confirmed. …"); the status is shown separately. */
@@ -153,4 +162,31 @@ export async function locationUsers(slug: GhlLocation["slug"]): Promise<Array<{ 
   const token = loc ? process.env[loc.tokenEnv] : undefined;
   if (!loc || !token) return [];
   return [...(await users(loc, token)).entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export interface CalendarPerson extends GhlUser {
+  /** Calendar kinds they've been booked on, with how many appointments. */
+  sales: number;
+  install: number;
+  locations: string[];
+}
+
+/** Everyone assigned to an appointment on the sales or installer calendars in the window. */
+export async function calendarPeople(fromIso: string, toIso: string): Promise<{ people: CalendarPerson[]; problems: CalendarResult["problems"] }> {
+  const { events, problems } = await loadCalendar(fromIso, toIso);
+  const details = new Map<string, GhlUser>();
+  for (const loc of GHL_LOCATIONS) {
+    const token = process.env[loc.tokenEnv];
+    if (token) for (const [id, u] of await userDetails(loc, token)) if (!details.has(id) || (!details.get(id)!.email && u.email)) details.set(id, u);
+  }
+  const by = new Map<string, CalendarPerson>();
+  for (const e of events) {
+    if (!e.assignedUserId) continue;
+    const u = details.get(e.assignedUserId) ?? { id: e.assignedUserId, name: e.assignedTo ?? "Unknown", email: null };
+    const p = by.get(u.id) ?? { ...u, sales: 0, install: 0, locations: [] };
+    p[e.kind] += 1;
+    if (!p.locations.includes(e.locationName)) p.locations.push(e.locationName);
+    by.set(u.id, p);
+  }
+  return { people: [...by.values()].sort((a, b) => b.sales + b.install - (a.sales + a.install)), problems };
 }

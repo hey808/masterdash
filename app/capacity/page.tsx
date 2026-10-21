@@ -1,4 +1,4 @@
-import { loadCapacity } from "@/lib/capacity";
+import { loadCapacity, syncCapacityMembers } from "@/lib/capacity";
 import { todayET } from "@/lib/dates";
 import { locationUsers } from "@/lib/ghl";
 import { loadOptions } from "@/lib/ledger/options";
@@ -9,6 +9,8 @@ export const metadata = { title: "Capacity" };
 
 export default async function CapacityPage({ searchParams }: { searchParams: { loc?: string; week?: string } }) {
   const today = todayET();
+  // Pull in anyone newly assigned on the GHL calendars before reading the team.
+  await syncCapacityMembers(today).catch((e) => console.error("capacity sync failed", e));
   const [cap, options] = await Promise.all([loadCapacity(today), loadOptions()]);
   const loc = cap.locations.find((l) => l.slug === searchParams.loc) ?? cap.locations[0];
   if (!loc) return <h1>Capacity</h1>;
