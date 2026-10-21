@@ -120,7 +120,7 @@ export default function PayRunView({ run, today, currentPayDate }: { run: PayRun
       {(run.undatedPayments > 0 || run.undatedPayouts > 0) && (
         <p className="hint block">
           {run.undatedPayments} payments imported from Mission Control have no date, so those deals count as collected before this run and won't appear in it.
-          If one of them was really collected this week, set its date from the ledger (click the Collected amount).
+          If one of them was really collected this week, set its date from the ledger (click the Customer Collected or Lender Collected amount).
         </p>
       )}
 

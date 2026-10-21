@@ -53,9 +53,9 @@ const COLUMNS: Col[] = [
   { key: "lenderRate", label: "Lender Fee %", field: "lenderRate", num: true, cell: (r) => fmtRate(r.lenderRate) },
   { key: "fees", label: "Fees", ...money((r) => r.feesCents) },
   { key: "net", label: "Net Revenue", ...money((r) => r.netRevenueCents) },
-  { key: "collectedCustomer", label: "Collected - Customer", ...money((r) => r.cashCollectedCents) },
+  { key: "collectedCustomer", label: "Customer Collected", ...money((r) => r.cashCollectedCents) },
   { key: "custOwes", label: "Customer Outstanding", ...money((r) => r.cashDueCents, (r) => Math.max(0, r.cashDueCents)), cellClass: (r) => (r.cashDueCents < 0 ? "neg" : "") },
-  { key: "collectedLender", label: "Collected - Lender", ...money((r) => r.fundedCents) },
+  { key: "collectedLender", label: "Lender Collected", ...money((r) => r.fundedCents) },
   { key: "lenderOwes", label: "Lender Outstanding", ...money((r) => r.fundingDueCents, (r) => Math.max(0, r.fundingDueCents)), cellClass: (r) => (r.fundingDueCents < 0 ? "neg" : "") },
   {
     key: "outstanding",
@@ -245,7 +245,7 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
           </button>
         )}
         {hiddenCount > 0 && <span>{hiddenCount} columns hidden in this view. Switch to All Deals to see them.</span>}
-        <span className="legend">White cells: click to edit. Shaded cells are calculated. Click a Collected amount to record a payment.</span>
+        <span className="legend">White cells: click to edit. Shaded cells are calculated. Click a Customer Collected or Lender Collected amount to record a payment.</span>
       </div>
       {flash && (
         <p className="flash" role="alert">
