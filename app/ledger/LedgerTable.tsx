@@ -30,6 +30,35 @@ const TODAY = todayET();
 const daysSince = (d: string | null) =>
   d == null ? null : Math.round((Date.parse(`${TODAY}T00:00:00Z`) - Date.parse(`${d}T00:00:00Z`)) / 86_400_000);
 
+/* ── Time frame (by sold date) ── */
+type Frame = "all" | "thisMonth" | "lastMonth" | "last30" | "last90" | "thisQuarter" | "thisYear" | "custom";
+const FRAMES: Record<Frame, string> = {
+  all: "All time",
+  thisMonth: "This month",
+  lastMonth: "Last month",
+  last30: "Last 30 days",
+  last90: "Last 90 days",
+  thisQuarter: "This quarter",
+  thisYear: "This year",
+  custom: "Custom range",
+};
+const shift = (d: string, days: number) => new Date(Date.parse(`${d}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+const monthStart = (y: number, m: number) => new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10); // m may be <0 or >11
+function frameRange(f: Frame, from: string, to: string): [string | null, string | null] {
+  const y = Number(TODAY.slice(0, 4));
+  const m = Number(TODAY.slice(5, 7)) - 1;
+  switch (f) {
+    case "all": return [null, null];
+    case "thisMonth": return [monthStart(y, m), TODAY];
+    case "lastMonth": return [monthStart(y, m - 1), shift(monthStart(y, m), -1)];
+    case "last30": return [shift(TODAY, -29), TODAY];
+    case "last90": return [shift(TODAY, -89), TODAY];
+    case "thisQuarter": return [monthStart(y, m - (m % 3)), TODAY];
+    case "thisYear": return [monthStart(y, 0), TODAY];
+    case "custom": return [from || null, to || null];
+  }
+}
+
 const openPayouts = (r: DerivedDeal) => sumCents(r.payoutPositions.map((p) => Math.max(0, p.openCents)));
 const sum = (pick: (r: DerivedDeal) => number) => (rows: DerivedDeal[]) => fmt(sumCents(rows.map(pick)));
 const money = (pick: (r: DerivedDeal) => number | null, totalPick?: (r: DerivedDeal) => number) => ({
@@ -180,6 +209,30 @@ export default function LedgerTable({ rows: initial, options, locations }: {
   const [flash, setFlash] = useState<string | null>(null);
   // null = the view's own order (newest first, or Receivables' priority order).
   const [numSort, setNumSort] = useState<NumSort>(null);
+  const [frame, setFrame] = useState<Frame>("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  // Remember the time frame in this browser.
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("ledger.frame") ?? "null") as { f?: string; from?: string; to?: string } | null;
+      if (saved?.f && saved.f in FRAMES) {
+        setFrame(saved.f as Frame);
+        setCustomFrom(saved.from ?? "");
+        setCustomTo(saved.to ?? "");
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem("ledger.frame", JSON.stringify({ f: frame, from: customFrom, to: customTo }));
+    } catch {
+      /* ignore */
+    }
+  }, [frame, customFrom, customTo]);
+  const [frameFrom, frameTo] = frameRange(frame, customFrom, customTo);
   const [paymentsFor, setPaymentsFor] = useState<{ id: string; source: "customer" | "lender" } | null>(null);
   const closePayments = useCallback(() => setPaymentsFor(null), []);
   const replaceRow = useCallback((d: DerivedDeal) => setRows((rs) => rs.map((r) => (r.id === d.id ? d : r))), []);
@@ -276,7 +329,8 @@ export default function LedgerTable({ rows: initial, options, locations }: {
   const hideCollapsed = viewDef.hide;
   const shown = hideCollapsed ? COLUMNS.filter((c) => !collapsed.has(c.key)) : COLUMNS;
   const viewRows = (() => {
-    const kept = viewDef.filter ? rows.filter(viewDef.filter) : rows;
+    const inFrame = frameFrom || frameTo ? rows.filter((r) => (!frameFrom || r.saleDate >= frameFrom) && (!frameTo || r.saleDate <= frameTo)) : rows;
+    const kept = viewDef.filter ? inFrame.filter(viewDef.filter) : inFrame;
     if (numSort) return [...kept].sort((a, b) => (numSort === "asc" ? a.number - b.number : b.number - a.number));
     return viewDef.sort ? [...kept].sort(viewDef.sort) : [...kept].sort((a, b) => b.number - a.number);
   })();
@@ -324,6 +378,19 @@ export default function LedgerTable({ rows: initial, options, locations }: {
             <a key={l.slug || "all"} href={l.href} className={l.on ? "on" : ""} aria-current={l.on ? "page" : undefined}>{l.label}</a>
           ))}
         </nav>
+        <div className="frame">
+          <select aria-label="Time frame (sold date)" value={frame} onChange={(e) => setFrame(e.target.value as Frame)} className={frame !== "all" ? "on" : ""}>
+            {(Object.keys(FRAMES) as Frame[]).map((f) => <option key={f} value={f}>{f === "all" ? "Sold: all time" : `Sold: ${FRAMES[f].toLowerCase()}`}</option>)}
+          </select>
+          {frame === "custom" && (
+            <>
+              <input type="date" aria-label="From" value={customFrom} max={customTo || undefined} onChange={(e) => setCustomFrom(e.target.value)} />
+              <span className="muted">to</span>
+              <input type="date" aria-label="To" value={customTo} min={customFrom || undefined} onChange={(e) => setCustomTo(e.target.value)} />
+            </>
+          )}
+          {frame !== "all" && frame !== "custom" && frameFrom && <span className="muted">{shortDate(frameFrom)} to {shortDate(frameTo)}</span>}
+        </div>
         {customized && (
           <button type="button" className="linkbtn" onClick={resetView}>
             Reset {VIEWS[view].label} columns

@@ -423,3 +423,9 @@ table.payout-lines input.amt { width: 110px; padding: 4px 6px; border: 1px solid
 .page-actions { display: flex; gap: 8px; margin-left: auto; }
 a.page-btn { display: inline-flex; align-items: center; padding: 7px 14px; font-size: 13.5px; text-decoration: none; }
 a.btn-primary.page-btn:hover { background: #0a3a8c; }
+
+/* Ledger time frame */
+.frame { display: flex; align-items: center; gap: 6px; padding-left: 16px; border-left: 1px solid var(--line); }
+.frame select, .frame input[type="date"] { padding: 4px 8px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font: 500 12.5px var(--font-body); color: var(--ink); }
+.frame input[type="date"] { border-radius: 6px; }
+.frame select.on { border-color: var(--blue); background: var(--mist); color: var(--navy); font-weight: 600; }
