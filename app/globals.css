@@ -1259,3 +1259,34 @@ td:hover .name-edit, .name-edit:focus-visible { opacity: 1; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 @media (max-width: 1200px) { .home-charts { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .home-charts > :last-child { grid-column: 1 / -1; } }
 @media (max-width: 760px) { .home-charts { grid-template-columns: 1fr; } }
+
+/* Capacity (simple) */
+.cap-rule { margin: -2px 0 14px; }
+.cap2 { display: grid; gap: 16px; }
+.cap2-card { display: grid; gap: 10px; padding: 18px 20px; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+.cap2-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; }
+.cap2-head h2 { margin: 0; font: 800 20px var(--font-display); color: var(--navy); }
+.cap2-head .ads-pill { font-size: 13px; padding: 4px 12px; }
+.cap2-why { margin: 0; color: #4a5d7e; font-size: 14px; }
+.cap2-table { box-shadow: none; }
+.cap2-table table { min-width: 640px; }
+.cap2-table th[scope=row] { text-align: left; white-space: normal; min-width: 150px; }
+.cap2-label { display: block; font-weight: 700; color: var(--navy); }
+.cap2-cell { min-width: 120px; }
+.cap2-pct { display: block; font: 800 20px var(--font-display); color: var(--navy); }
+.cap2-bar { display: block; height: 7px; margin: 5px 0 4px; border-radius: 999px; background: #eef2f8; overflow: hidden; }
+.cap2-bar span { display: block; height: 100%; border-radius: 999px; background: #9cc6f9; }
+.cap2-cell.mid .cap2-bar span { background: var(--blue); }
+.cap2-cell.full .cap2-bar span { background: #12804e; }
+.cap2-cell.over .cap2-bar span { background: var(--red); }
+.cap2-cell.over .cap2-pct { color: #b10a1f; }
+.cap2-nums { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.cap2-team { display: grid; gap: 8px; padding-top: 4px; border-top: 1px solid var(--line); }
+.cap2-team-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.cap2-team-title { font: 700 12px var(--font-body); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
+.cap2-chip { padding: 5px 12px; border: 1px solid var(--line-2); border-radius: 999px; background: #fff; font: 500 13.5px var(--font-body); color: var(--muted); cursor: pointer; }
+.cap2-chip.on { border-color: #b9d7fb; background: #eef6ff; color: var(--navy); font-weight: 600; }
+.cap2-chip-note { font-weight: 400; color: var(--muted); }
+.cap2-table tbody th[scope=row] { text-transform: none; letter-spacing: 0; font: inherit; background: #fff; }
+.cap2-table tbody th[scope=row] .cap2-label { font: 700 14.5px var(--font-body); }
+.cap2-table tbody th[scope=row] .small { display: block; margin-top: 2px; }

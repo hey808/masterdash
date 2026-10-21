@@ -4,7 +4,7 @@ import { adsCall } from "./capacity";
 const base = { salesCapacity: 40, salesBooked: 20, targetPct: 85, installBacklogWeeks: 1, costPerApptCents: 12_000 };
 
 describe("adsCall", () => {
-  it("holds with no capacity set", () => expect(adsCall({ ...base, salesCapacity: 0 }).level).toBe("hold"));
+  it("holds with no reps", () => expect(adsCall({ ...base, salesCapacity: 0 }).level).toBe("hold"));
   it("pushes hard when far under target, with spend", () => {
     const a = adsCall(base); // 50% vs 85%: target 34, need 14
     expect(a.level).toBe("push-hard");

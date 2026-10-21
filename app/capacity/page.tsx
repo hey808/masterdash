@@ -1,39 +1,26 @@
-import { loadCapacity, syncCapacityMembers } from "@/lib/capacity";
+import { DAYS_PER_WEEK, SLOTS_PER_DAY, loadCapacity, syncCapacityMembers } from "@/lib/capacity";
 import { todayET } from "@/lib/dates";
-import { locationUsers } from "@/lib/ghl";
-import { loadOptions } from "@/lib/ledger/options";
 import CapacityView from "./CapacityView";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Capacity" };
 
-export default async function CapacityPage({ searchParams }: { searchParams: { loc?: string; week?: string } }) {
+export default async function CapacityPage() {
   const today = todayET();
-  // Pull in anyone newly assigned on the GHL calendars before reading the team.
+  // Anyone newly booked on the GHL calendars joins their location's team.
   await syncCapacityMembers(today).catch((e) => console.error("capacity sync failed", e));
-  const [cap, options] = await Promise.all([loadCapacity(today), loadOptions()]);
-  const loc = cap.locations.find((l) => l.slug === searchParams.loc) ?? cap.locations[0];
-  if (!loc) return <h1>Capacity</h1>;
-  const weekIdx = Math.max(0, cap.weeks.indexOf(searchParams.week ?? ""));
-  const ghlUsers = await locationUsers(loc.slug);
+  const cap = await loadCapacity(today);
   return (
     <>
       <div className="page-head">
         <h1>Capacity</h1>
       </div>
-      <nav className="tabs">
-        {cap.locations.map((l) => (
-          <a key={l.slug} href={`/capacity?loc=${l.slug}`} className={l.slug === loc.slug ? "on" : ""} aria-current={l.slug === loc.slug ? "page" : undefined}>
-            {l.name}
-          </a>
-        ))}
-      </nav>
-      {cap.problems.length > 0 && (
-        <ul className="report-flags">
-          {cap.problems.map((p, i) => <li key={i}>{p.location}: {p.message}</li>)}
-        </ul>
-      )}
-      <CapacityView loc={loc} weeks={cap.weeks} weekIdx={weekIdx} people={options.people} ghlUsers={ghlUsers} today={today} />
+      <p className="muted cap-rule">
+        Each rep has {SLOTS_PER_DAY.sales} sales appointments a day and each installer {SLOTS_PER_DAY.install} installs a day, {DAYS_PER_WEEK} days a week.
+        Booked comes from the GoHighLevel calendars.
+      </p>
+      {cap.problems.length > 0 && <ul className="report-flags">{cap.problems.map((p, i) => <li key={i}>{p.location}: {p.message}</li>)}</ul>}
+      <CapacityView locations={cap.locations} weeks={cap.weeks} />
     </>
   );
 }

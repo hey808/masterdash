@@ -1,7 +1,9 @@
 /**
  * Appointment slot capacity and utilization, per location and week.
  *
- *   capacity  = sum of each active team member's weekly slots (or that week's override)
+ *   capacity  = every active rep: 3 sales appointments a day, every active installer:
+ *               2 installs a day, 6 days a week (Cade, 2026-10-21). Someone who books at
+ *               both locations counts where they booked most over the last 4 weeks.
  *   booked    = GoHighLevel appointments on that location's sales / installer calendars
  *               that week, not cancelled or invalid (no-shows used the slot, so they count)
  *   utilization = booked / capacity
@@ -10,6 +12,11 @@
  * are already weeks behind the installers, more appointments only make the wait longer.
  */
 import { z } from "zod";
+
+/** Slots per person per week: 3 a day (sales) or 2 a day (installs), 6 days a week. */
+export const SLOTS_PER_DAY = { sales: 3, install: 2 } as const;
+export const DAYS_PER_WEEK = 6;
+export const weeklySlots = (role: "sales" | "install") => SLOTS_PER_DAY[role] * DAYS_PER_WEEK;
 import { db, tx } from "./db";
 import { matchRoster } from "./person-match";
 import { loadCalendar, type CalEvent, type GhlLocation } from "./ghl";
@@ -49,7 +56,7 @@ export function adsCall(i: {
   const backlog = i.installBacklogWeeks;
 
   if (i.salesCapacity === 0) {
-    return { level: "hold", needed: 0, spendCents: null, headline: "No sales capacity set", why: "Add salespeople and their weekly appointment slots below." };
+    return { level: "hold", needed: 0, spendCents: null, headline: "No reps on the calendar", why: "Nobody is booking sales appointments at this location yet." };
   }
   if (backlog != null && backlog > 4) {
     return {
@@ -93,6 +100,8 @@ export interface Member {
   personName: string;
   role: CapRole;
   weeklySlots: number;
+  /** False when this person mostly books at the other location (no capacity counted here). */
+  primary: boolean;
   ghlUserId: string | null;
   active: boolean;
   /** Per week shown: slots that week and appointments booked under their GHL user. */
@@ -138,8 +147,21 @@ export async function loadCapacity(today: string, firstWeek = mondayOf(today), w
     db().query("select member_id, week_start::text as week_start, slots from capacity_overrides where week_start >= $1 and week_start < $2", [weeks[0], end]).catch(missing),
     db().query("select location_id, target_pct, cost_per_appt_cents from capacity_settings").catch(missing),
     db().query("select location_id, count(*)::int as n from deals where installed_on is null and cancelled_at is null group by location_id"),
-    loadCalendar(`${addDays(weeks[0]!, -1)}T12:00:00Z`, `${end}T12:00:00Z`),
+    loadCalendar(`${addDays(weeks[0]!, -29)}T12:00:00Z`, `${end}T12:00:00Z`),
   ]);
+  // Each person's main location per role: where they had the most bookings in the last 4 weeks.
+  const recent = cal.events.filter((e) => e.assignedUserId && COUNTS(e) && e.day >= addDays(weeks[0]!, -28) && e.day < weeks[0]!);
+  const mainLoc = new Map<string, string>();
+  {
+    const counts = new Map<string, Map<string, number>>();
+    for (const e of recent) {
+      const k = `${e.kind}:${e.assignedUserId}`;
+      const m = counts.get(k) ?? new Map<string, number>();
+      m.set(e.location, (m.get(e.location) ?? 0) + 1);
+      counts.set(k, m);
+    }
+    for (const [k, m] of counts) mainLoc.set(k, [...m.entries()].sort((a, b) => b[1] - a[1])[0]![0]);
+  }
   const overrides = new Map(overrideRows.rows.map((r) => [`${r.member_id}:${r.week_start}`, Number(r.slots)]));
   const weekOf = (day: string) => weeks.find((w) => day >= w && day < addDays(w, 7)) ?? null;
 
@@ -159,11 +181,14 @@ export async function loadCapacity(today: string, firstWeek = mondayOf(today), w
           weeklySlots: Number(m.weekly_slots),
           ghlUserId: m.ghl_user_id,
           active: m.active,
+          // Counted here unless they mostly book at the other location.
+          primary: !m.ghl_user_id || (mainLoc.get(`${m.role}:${m.ghl_user_id}`) ?? slug) === slug,
           weeks: weeks.map((w) => {
             const o = overrides.get(`${m.id}:${w}`);
+            const home = !m.ghl_user_id || (mainLoc.get(`${m.role}:${m.ghl_user_id}`) ?? slug) === slug;
             return {
               week: w,
-              slots: m.active ? (o ?? Number(m.weekly_slots)) : 0,
+              slots: m.active && home ? (o ?? weeklySlots(m.role as CapRole)) : 0,
               override: o != null,
               booked: m.ghl_user_id ? evs.filter((e) => e.kind === (m.role === "sales" ? "sales" : "install") && e.assignedUserId === m.ghl_user_id && weekOf(e.day) === w).length : 0,
             };
