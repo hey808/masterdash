@@ -9,8 +9,8 @@ type Item = Link | { label: string; href?: string; links: Link[] };
 
 const ADMIN_MENU: Item[] = [
   { href: "/", label: "Home" },
-  { label: "Sales", href: "/sales", links: [{ href: "/sales", label: "Dashboard" }, { href: "/appointments", label: "Appointments" }, { href: "/agreements", label: "Agreements" }, { href: "/ledger", label: "Ledger" }, { href: "/commissions", label: "Commissions" }, { href: "/forms", label: "Forms" }] },
-  { label: "Operations", href: "/operations", links: [{ href: "/operations", label: "Dashboard" }, { href: "/installs", label: "Installs" }, { href: "/calendar", label: "Calendar" }, { href: "/capacity", label: "Capacity" }, { href: "/inventory", label: "Inventory" }, { href: "/activity", label: "Activity" }] },
+  { label: "Sales", href: "/sales", links: [{ href: "/sales", label: "Dashboard" }, { href: "/ledger", label: "Ledger" }, { href: "/appointments", label: "Appointments" }, { href: "/agreements", label: "Agreements" }, { href: "/forms", label: "Forms" }] },
+  { label: "Operations", href: "/operations", links: [{ href: "/operations", label: "Dashboard" }, { href: "/calendar", label: "Calendar" }, { href: "/inventory", label: "Inventory" }, { href: "/capacity", label: "Capacity" }, { href: "/activity", label: "Activity" }, { href: "/installs", label: "Installs" }] },
   { label: "Finance", href: "/reports", links: [{ href: "/bank", label: "Bank" }, { href: "/reports", label: "Reports" }] },
 ];
 const SALES_MENU: Item[] = [{ href: "/appointments", label: "Appointments" }, { href: "/agreements", label: "Agreements" }, { href: "/me", label: "My commissions" }, { href: "/forms/sale", label: "Sales form" }];
