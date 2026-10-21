@@ -326,9 +326,7 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
           </button>
         )}
         {viewDef.note && <span className="view-note">{viewDef.note}</span>}
-        {hiddenCount > 0 && !viewDef.note && <span>{hiddenCount} columns hidden in this view. Switch to All Deals to see them.</span>}
-        <span className="legend">White cells: click to edit. Shaded cells are calculated. Click a Customer Collected or Lender Collected amount to record a payment.</span>
-      </div>
+        {hiddenCount > 0 && !viewDef.note && <span>{hiddenCount} columns hidden in this view. Switch to All Deals to see them.</span>}      </div>
       {flash && (
         <p className="flash" role="alert">
           {flash} <button type="button" className="linkbtn" onClick={() => setFlash(null)}>Dismiss</button>
