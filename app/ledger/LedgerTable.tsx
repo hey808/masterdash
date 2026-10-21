@@ -250,6 +250,12 @@ export default function LedgerTable({ rows: initial, options, locations }: {
     } catch {
       /* ignore */
     }
+    // A link like /ledger?view=receivables (from Home) opens that view across all dates.
+    const asked = new URLSearchParams(window.location.search).get("view");
+    if (asked && asked in VIEWS) {
+      v = asked as ViewKey;
+      setFrame("all");
+    }
     loadView(v);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -274,6 +274,11 @@ export interface HomeMetrics {
   collectedUndated: number;
   receivableCents: number;
   receivableDeals: number;
+  /** Of the deals sold in the window, how many are installed. */
+  soldInstalled: number;
+  /** As of today: still to collect on sold jobs that aren't installed yet (owed at/after install, so not receivable yet). */
+  backlogDueCents: number;
+  backlogDeals: number;
   expensesCents: number;
   bankThrough: string | null;
   reps: PersonStat[];
@@ -288,7 +293,9 @@ export async function homeMetrics(today: string, from: string, to: string = toda
 
   const installed = l.filter((d) => inWin(d.installedOn));
   const sold = l.filter((d) => inWin(d.saleDate));
-  const ar = l.filter((d) => d.isInstalled && Math.max(0, d.cashDueCents) + Math.max(0, d.fundingDueCents) > SETTLED);
+  const due = (d: DerivedDeal) => Math.max(0, d.cashDueCents) + Math.max(0, d.fundingDueCents);
+  const ar = l.filter((d) => d.isInstalled && due(d) > SETTLED);
+  const backlog = l.filter((d) => !d.isInstalled && due(d) > SETTLED);
 
   const rank = (rows: DerivedDeal[], who: (d: DerivedDeal) => string | null): PersonStat[] => {
     const m = new Map<string, { deals: number; rev: number }>();
@@ -325,6 +332,9 @@ export async function homeMetrics(today: string, from: string, to: string = toda
     collectedUndated: collected.filter((x) => x.undated).length,
     receivableCents: sumCents(ar.map((d) => Math.max(0, d.cashDueCents) + Math.max(0, d.fundingDueCents))),
     receivableDeals: ar.length,
+    soldInstalled: sold.filter((d) => d.isInstalled).length,
+    backlogDueCents: sumCents(backlog.map(due)),
+    backlogDeals: backlog.length,
     expensesCents: -sumCents(txns.filter((t) => spendKinds.has(t.kind) && t.amountCents < 0).map((t) => t.amountCents)),
     bankThrough: balances.map((b) => b.lastOn).filter(Boolean).sort().at(-1) ?? null,
     reps: rank(sold, (d) => d.closer?.name ?? null),

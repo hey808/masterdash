@@ -882,3 +882,8 @@ p.small, span.small, .muted.small { font-size: 12.5px; }
 table.team-cap tr.needs-slots td { background: #fffaf0; }
 .set-slots { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: #fff4dc; color: #8a5a00; font: 600 11.5px var(--font-body); }
 .team-note { margin: -4px 0 8px; }
+.form-panel { max-width: 720px; padding: 20px 22px; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+.saved-note { margin: 0 0 14px; padding: 10px 14px; border-radius: var(--radius-sm); background: #e2f6ea; color: #17673a; font-weight: 600; }
+
+.big-stat .note { font-size: 12.5px; color: #4a5d7e; line-height: 1.35; }
+@media (min-width: 1100px) { .home-stats { grid-template-columns: repeat(5, minmax(0, 1fr)); } }

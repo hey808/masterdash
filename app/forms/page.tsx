@@ -17,6 +17,10 @@ export default function FormsPage() {
           <span className="form-card-kicker">Office</span>
           <span className="form-card-title">Payout form</span>
         </a>
+        <a className="form-card" href="/forms/purchase-order">
+          <span className="form-card-kicker">Warehouse</span>
+          <span className="form-card-title">Purchase order form</span>
+        </a>
       </div>
     </>
   );

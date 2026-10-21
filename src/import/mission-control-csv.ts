@@ -211,12 +211,12 @@ export function planImport(rows: McRow[], ctx: ImportContext): ImportPlan {
     const fundedCents = money(r.Funded);
     const cardFeeCents = money(r["Card fee"]);
     const payments: PlannedDeal["payments"] = [];
-    let cardFeeOverrideCents: Cents | null = null;
+    const cardFeeOverrideCents: Cents | null = null;
     if (cashCollectedCents !== 0) {
       payments.push({ source: "customer", method: "unknown", amountCents: cashCollectedCents, feeCents: cardFeeCents > 0 ? cardFeeCents : 0 });
     } else if (cardFeeCents > 0) {
-      cardFeeOverrideCents = cardFeeCents;
-      reasons.push(`expected card fee of ${dollars(cardFeeCents)} before any card payment`);
+      // Mission Control projected a card fee before any payment. Not a real cost: card fees come from card payments.
+      issue("info", `Mission Control projected a ${dollars(cardFeeCents)} card fee with nothing collected; left out`);
     }
     if (fundedCents !== 0) payments.push({ source: "lender", method: "lender", amountCents: fundedCents, feeCents: 0 });
 

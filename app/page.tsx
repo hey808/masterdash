@@ -33,9 +33,10 @@ export default async function Home({ searchParams }: { searchParams: { frame?: s
       </div>
 
       <div className="home-stats">
-        <Big label="Revenue" value={fmt(m.soldCents)} href="/ledger" />
-        <Big label="Collected" value={fmt(m.collectedCents)} href="/ledger" flag={m.collectedUndated ? `${m.collectedUndated} imported payment${m.collectedUndated === 1 ? "" : "s"} dated by install day` : undefined} />
-        <Big label="Accounts receivable" value={fmt(m.receivableCents)} href="/ledger" tone={m.receivableCents > 0 ? "due" : undefined} />
+        <Big label="Revenue (sold)" value={fmt(m.soldCents)} href="/ledger" note={`${m.sold} deal${m.sold === 1 ? "" : "s"} sold: ${m.soldInstalled} installed, ${m.sold - m.soldInstalled} waiting on install`} />
+        <Big label="Collected" value={fmt(m.collectedCents)} href="/ledger" note="Cash in during this period, any deal" flag={m.collectedUndated ? `${m.collectedUndated} imported payment${m.collectedUndated === 1 ? "" : "s"} dated by install day` : undefined} />
+        <Big label="Accounts receivable" value={fmt(m.receivableCents)} href="/ledger?view=receivables" tone={m.receivableCents > 0 ? "due" : undefined} note={`Today, all time: ${m.receivableDeals} installed job${m.receivableDeals === 1 ? "" : "s"} with a balance`} />
+        <Big label="Due after install" value={fmt(m.backlogDueCents)} href="/ledger" note={`Today, all time: ${m.backlogDeals} sold job${m.backlogDeals === 1 ? "" : "s"} not installed yet`} />
         <Big label="Expenses" value={fmt(m.expensesCents)} href="/reports" flag={bankBehind ? `Bank through ${shortDate(m.bankThrough)}` : m.bankThrough == null ? "Import bank statements" : undefined} />
       </div>
 
@@ -63,11 +64,12 @@ export default async function Home({ searchParams }: { searchParams: { frame?: s
   );
 }
 
-function Big({ label, value, href, tone, flag }: { label: string; value: string; href: string; tone?: "due"; flag?: string }) {
+function Big({ label, value, href, tone, flag, note }: { label: string; value: string; href: string; tone?: "due"; flag?: string; note?: string }) {
   return (
     <a className={`big-stat ${tone ?? ""}`} href={href}>
       <span className="label">{label}</span>
       <span className="value">{value}</span>
+      {note && <span className="note">{note}</span>}
       {flag && <span className="flag">{flag}</span>}
     </a>
   );
