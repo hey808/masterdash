@@ -50,12 +50,12 @@ export default async function ActivityPage({ searchParams }: { searchParams: { s
     <>
       <h1>Activity</h1>
       <div className="table-bar">
-        <nav className="filters views" aria-label="What to show">
+        <nav className="segmented" aria-label="What to show">
           {(Object.keys(SHOW) as Show[]).map((s) => (
             <a key={s} href={href(s, loc)} className={s === show ? "on" : ""} aria-current={s === show ? "page" : undefined}>{SHOW[s].label}</a>
           ))}
         </nav>
-        <nav className="filters" aria-label="Location">
+        <nav className="filters loc-pills" aria-label="Location">
           <a href={href(show, null)} className={loc == null ? "on" : ""}>All locations</a>
           {open.map((l) => (
             <a key={l.slug} href={href(show, l.slug)} className={l.slug === loc ? "on" : ""}>{l.name}</a>

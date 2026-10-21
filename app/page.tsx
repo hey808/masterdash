@@ -1,29 +1,25 @@
 import { shortDate, todayET } from "@/lib/dates";
 import { fmt } from "@/lib/money";
 import { homeMetrics, type PersonStat } from "@/lib/reports";
+import { frameRange, isFrame, type Frame } from "@/lib/timeframe";
+import HomeFrame from "./HomeFrame";
 
 export const dynamic = "force-dynamic";
 
-const WINDOWS = [7, 30, 90] as const;
+const DEFAULT: Frame = "last30";
 
-export default async function Home({ searchParams }: { searchParams: { days?: string } }) {
-  const days = WINDOWS.find((d) => String(d) === searchParams.days) ?? 30;
+export default async function Home({ searchParams }: { searchParams: { frame?: string; from?: string; to?: string } }) {
+  const frame: Frame = isFrame(searchParams.frame) ? searchParams.frame : DEFAULT;
   const today = todayET();
-  const m = await homeMetrics(today, days);
+  const [rf, rt] = frameRange(frame, today, searchParams.from, searchParams.to);
+  const m = await homeMetrics(today, rf ?? "2000-01-01", rt ?? today);
   const bankBehind = m.bankThrough != null && m.bankThrough < today;
 
   return (
     <>
       <h1>Home</h1>
       <div className="table-bar">
-        <nav className="segmented" aria-label="Period">
-          {WINDOWS.map((d) => (
-            <a key={d} href={d === 30 ? "/" : `/?days=${d}`} className={d === days ? "on" : ""} aria-current={d === days ? "page" : undefined}>
-              Last {d} days
-            </a>
-          ))}
-        </nav>
-        <span className="muted">{shortDate(m.from)} to {shortDate(m.to)}</span>
+        <HomeFrame frame={frame} from={searchParams.from ?? ""} to={searchParams.to ?? ""} />
       </div>
 
       <div className="home-stats">

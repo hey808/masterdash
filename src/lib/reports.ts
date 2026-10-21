@@ -280,11 +280,11 @@ export interface HomeMetrics {
   installers: PersonStat[];
 }
 
-export async function homeMetrics(today: string, days: number): Promise<HomeMetrics> {
-  const from = addDays(today, -(days - 1));
-  const [deals, txns, balances] = await Promise.all([loadLedger(today), loadTransactions({ from, to: today }), accountBalances(today)]);
+/** Metrics for `from` through `to`, inclusive (receivables are as of today). */
+export async function homeMetrics(today: string, from: string, to: string = today): Promise<HomeMetrics> {
+  const [deals, txns, balances] = await Promise.all([loadLedger(today), loadTransactions({ from, to }), accountBalances(today)]);
   const l = live(deals);
-  const inWin = (d: string | null) => d != null && d >= from && d <= today;
+  const inWin = (d: string | null) => d != null && d >= from && d <= to;
 
   const installed = l.filter((d) => inWin(d.installedOn));
   const sold = l.filter((d) => inWin(d.saleDate));
@@ -316,7 +316,7 @@ export async function homeMetrics(today: string, days: number): Promise<HomeMetr
   const spendKinds = new Set(["ledger", "cogs", "opex", "uncategorized"]);
   return {
     from,
-    to: today,
+    to,
     revenueCents: sumCents(installed.map((d) => d.priceCents)),
     installs: installed.length,
     soldCents: sumCents(sold.map((d) => d.priceCents)),

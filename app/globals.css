@@ -436,3 +436,4 @@ a.btn-primary.page-btn:hover { background: #0a3a8c; }
 .btn-danger { padding: 6px 14px; border: 0; border-radius: 5px; background: var(--red); color: #fff; font: 600 13px var(--font-body); cursor: pointer; }
 .btn-danger:hover { background: #c40a21; }
 .cellbtn.stagebtn { text-align: left; text-decoration: none; padding: 4px 6px; }
+.table-bar > .frame:first-child { border-left: 0; padding-left: 0; }
