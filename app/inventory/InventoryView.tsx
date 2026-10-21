@@ -21,7 +21,9 @@ async function post(url: string, payload: unknown): Promise<{ ok: boolean; error
 }
 
 export default function InventoryView(props: {
-  location: string;
+  /** null = every location combined (read-only stock; purchase orders pick a location). */
+  location: string | null;
+  locations: Array<{ slug: string; name: string }>;
   locationName: string;
   stock: StockRow[];
   pos: PurchaseOrderView[];
@@ -29,6 +31,7 @@ export default function InventoryView(props: {
   today: string;
 }) {
   const { location, locationName, stock, pos, today } = props;
+  const combined = location == null;
   const router = useRouter();
   const [counting, setCounting] = useState<StockRow | null>(null);
   const [newPO, setNewPO] = useState(false);
@@ -52,16 +55,16 @@ export default function InventoryView(props: {
   return (
     <>
       <div className="run-totals">
-        <Stat label="On the shelf" value={String(stock.reduce((s, r) => s + Math.max(0, r.onHand), 0))} note={`units at ${locationName}`} />
-        <Stat label="Set aside for sold jobs" value={String(stock.reduce((s, r) => s + r.committed, 0))} note="leave when installed" />
-        <Stat label="On order" value={String(stock.reduce((s, r) => s + r.onOrder, 0))} note={`${pos.filter((p) => p.status === "ordered").length} open purchase orders`} />
-        <Stat label="Shelf value" value={fmt(sumCents(stock.map((r) => r.valueCents)))} note="at current cost" />
-        <Stat label="Need ordering" value={String(toOrder.length)} note={toOrder.map((r) => r.skuCode).join(", ") || "nothing"} tone={toOrder.length ? "due" : "paid"} />
+        <Stat label="On the shelf" value={String(stock.reduce((s, r) => s + Math.max(0, r.onHand), 0))} />
+        <Stat label="Set aside for sold jobs" value={String(stock.reduce((s, r) => s + r.committed, 0))} />
+        <Stat label="On order" value={String(stock.reduce((s, r) => s + r.onOrder, 0))} />
+        <Stat label="Shelf value" value={fmt(sumCents(stock.map((r) => r.valueCents)))} />
+        <Stat label="Need ordering" value={String(toOrder.length)} tone={toOrder.length ? "due" : "paid"} />
       </div>
 
       {needsCount && (
         <p className="hint block">
-          No starting count or purchase orders yet for some products, so their shelf number is negative (installs have been subtracting from zero). Click <strong>Count</strong> on each row and enter what's on the shelf today.
+          No starting count or purchase orders yet for some products, so their shelf number is negative (installs have been subtracting from zero). {combined ? "Count each warehouse's shelf on its own tab." : <>Click <strong>Count</strong> on each row and enter what&apos;s on the shelf today.</>}
         </p>
       )}
       {error && <p className="flash" role="alert">{error}</p>}
@@ -82,7 +85,7 @@ export default function InventoryView(props: {
               <th className="num">Weeks of cover</th>
               <th>Status</th>
               <th className="num">Value</th>
-              <th />
+              {!combined && <th />}
             </tr>
           </thead>
           <tbody>
@@ -97,13 +100,12 @@ export default function InventoryView(props: {
                 <td className="num">{r.weeksOfCover == null ? "—" : r.weeksOfCover.toFixed(1)}</td>
                 <td><span className={`inv-status ${r.status}`}>{STATUS_LABEL[r.status]}</span></td>
                 <td className="num">{fmt(r.valueCents)}</td>
-                <td><button type="button" className="btn-outline" onClick={() => setCounting(r)}>Count</button></td>
+                {!combined && <td><button type="button" className="btn-outline" onClick={() => setCounting(r)}>Count</button></td>}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <p className="muted small">On shelf = received on purchase orders + counts − installed jobs. Set aside = products on sold jobs not installed yet. Order when available + on order covers less than 3 weeks of installs.</p>
 
       <div className="section-head">
         <h2 className="section">Purchase orders</h2>
@@ -115,12 +117,13 @@ export default function InventoryView(props: {
         <div className="tablewrap">
           <table>
             <thead>
-              <tr><th>PO</th><th>Vendor</th><th>Ordered</th><th>Expected</th><th>Items</th><th className="num">Total</th><th>Status</th><th /></tr>
+              <tr><th>PO</th>{combined && <th>Location</th>}<th>Vendor</th><th>Ordered</th><th>Expected</th><th>Items</th><th className="num">Total</th><th>Status</th><th /></tr>
             </thead>
             <tbody>
               {pos.map((po) => (
                 <tr key={po.id}>
                   <td className="muted">PO-{String(po.number).padStart(4, "0")}</td>
+                  {combined && <td>{po.locationName}</td>}
                   <td>{po.vendor}</td>
                   <td>{shortDate(po.orderedOn)}</td>
                   <td>{po.expectedOn ? shortDate(po.expectedOn) : "—"}</td>
@@ -146,8 +149,8 @@ export default function InventoryView(props: {
         </div>
       )}
 
-      {counting && <CountModal row={counting} location={location} locationName={locationName} today={today} onClose={closeCount} onDone={() => { setCounting(null); router.refresh(); }} />}
-      {newPO && <POModal location={location} locationName={locationName} skus={props.skus} today={today} onClose={closePO} onDone={() => { setNewPO(false); router.refresh(); }} />}
+      {counting && location && <CountModal row={counting} location={location} locationName={locationName} today={today} onClose={closeCount} onDone={() => { setCounting(null); router.refresh(); }} />}
+      {newPO && <POModal location={location} locations={props.locations} locationName={locationName} skus={props.skus} today={today} onClose={closePO} onDone={() => { setNewPO(false); router.refresh(); }} />}
     </>
   );
 }
@@ -192,10 +195,11 @@ function CountModal({ row, location, locationName, today, onClose, onDone }: { r
   );
 }
 
-function POModal({ location, locationName, skus, today, onClose, onDone }: {
-  location: string; locationName: string; skus: Array<{ code: string; name: string; costCents?: number }>; today: string; onClose: () => void; onDone: () => void;
+function POModal({ location: fixedLocation, locations, locationName, skus, today, onClose, onDone }: {
+  location: string | null; locations: Array<{ slug: string; name: string }>; locationName: string; skus: Array<{ code: string; name: string; costCents?: number }>; today: string; onClose: () => void; onDone: () => void;
 }) {
   const [lines, setLines] = useState<Array<{ skuCode: string; qty: string; cost: string }>>([{ skuCode: skus[0]?.code ?? "", qty: "1", cost: ((skus[0]?.costCents ?? 0) / 100).toFixed(2) }]);
+  const [location, setLocation] = useState(fixedLocation ?? "");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const costOf = (code: string) => ((skus.find((s) => s.code === code)?.costCents ?? 0) / 100).toFixed(2);
@@ -206,6 +210,7 @@ function POModal({ location, locationName, skus, today, onClose, onDone }: {
     setError(null);
     const f = new FormData(e.currentTarget);
     const parsed = lines.map((l) => ({ skuCode: l.skuCode, qty: Number(l.qty), unitCostCents: parseMoneyInput(l.cost) }));
+    if (!location) return setError("Pick which warehouse it's going to.");
     if (parsed.some((l) => !l.qty || l.qty < 1 || l.unitCostCents == null || Number.isNaN(l.unitCostCents))) return setError("Every line needs a quantity and a unit cost.");
     setBusy(true);
     const r = await post("/api/purchase-orders", {
@@ -217,9 +222,17 @@ function POModal({ location, locationName, skus, today, onClose, onDone }: {
   }
 
   return (
-    <Modal title={`New purchase order: ${locationName}`} onClose={onClose} width={640}>
+    <Modal title={fixedLocation ? `New purchase order: ${locationName}` : "New purchase order"} onClose={onClose} width={640}>
       <form className="pay-form" onSubmit={submit}>
         <div className="grid">
+          {!fixedLocation && (
+            <label>Warehouse
+              <select value={location} onChange={(e) => setLocation(e.target.value)} required>
+                <option value="" disabled>Choose…</option>
+                {locations.map((l) => <option key={l.slug} value={l.slug}>{l.name}</option>)}
+              </select>
+            </label>
+          )}
           <label>Vendor<input name="vendor" required placeholder="Aquonyx" /></label>
           <label>Ordered on<input name="orderedOn" type="date" required defaultValue={today} /></label>
           <label>Expected<input name="expectedOn" type="date" min={today} /></label>

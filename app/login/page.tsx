@@ -6,7 +6,6 @@ export default function LoginPage({ searchParams }: { searchParams: { next?: str
   return (
     <section className="login">
       <h1>Sign in</h1>
-      <p className="sub">Once per browser. You'll stay signed in for a year.</p>
       <form method="post" action="/api/login">
         <input type="hidden" name="next" value={searchParams.next ?? "/ledger"} />
         <label htmlFor="password">Password</label>

@@ -294,7 +294,6 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
       /* ignore */
     }
   };
-  const hiddenCount = hideCollapsed ? COLUMNS.length - shown.length : 0;
 
   const pin = (key: string) =>
     key === "number"
@@ -324,9 +323,7 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
           <button type="button" className="linkbtn" onClick={clearNumSort}>
             Back to {VIEWS[view].label} order
           </button>
-        )}
-        {viewDef.note && <span className="view-note">{viewDef.note}</span>}
-        {hiddenCount > 0 && !viewDef.note && <span>{hiddenCount} columns hidden in this view. Switch to All Deals to see them.</span>}      </div>
+        )}      </div>
       {flash && (
         <p className="flash" role="alert">
           {flash} <button type="button" className="linkbtn" onClick={() => setFlash(null)}>Dismiss</button>

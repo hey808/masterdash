@@ -41,23 +41,24 @@ export function stockStatus(available: number, onOrder: number, weeklyUse: numbe
   return available + onOrder < weeklyUse * COVER_WEEKS ? "order" : "ok";
 }
 
-export async function loadStock(locationSlug: string, today = todayET()): Promise<StockRow[]> {
+/** One location's stock, or every location combined when locationSlug is null. */
+export async function loadStock(locationSlug: string | null, today = todayET()): Promise<StockRow[]> {
   const since = addDays(today, -28);
   const { rows } = await db().query(
-    `with loc as (select id from locations where slug = $1)
+    `with loc as (select id from locations where $1::text is null or slug = $1)
      select s.code, s.name,
        coalesce(sku_cost_on(s.code, $2::date), 0) as cost,
        coalesce((select sum(pol.qty) from purchase_order_lines pol join purchase_orders po on po.id = pol.po_id
-                 where pol.sku_code = s.code and po.location_id = (select id from loc) and po.status = 'received'), 0) as received,
+                 where pol.sku_code = s.code and po.location_id in (select id from loc) and po.status = 'received'), 0) as received,
        coalesce((select sum(pol.qty) from purchase_order_lines pol join purchase_orders po on po.id = pol.po_id
-                 where pol.sku_code = s.code and po.location_id = (select id from loc) and po.status = 'ordered'), 0) as on_order,
-       coalesce((select sum(a.qty_delta) from inventory_adjustments a where a.sku_code = s.code and a.location_id = (select id from loc)), 0) as adjusted,
+                 where pol.sku_code = s.code and po.location_id in (select id from loc) and po.status = 'ordered'), 0) as on_order,
+       coalesce((select sum(a.qty_delta) from inventory_adjustments a where a.sku_code = s.code and a.location_id in (select id from loc)), 0) as adjusted,
        coalesce((select sum(dl.qty) from deal_lines dl join deals d on d.id = dl.deal_id
-                 where dl.sku_code = s.code and d.location_id = (select id from loc) and d.cancelled_at is null and d.installed_on is not null), 0) as installed,
+                 where dl.sku_code = s.code and d.location_id in (select id from loc) and d.cancelled_at is null and d.installed_on is not null), 0) as installed,
        coalesce((select sum(dl.qty) from deal_lines dl join deals d on d.id = dl.deal_id
-                 where dl.sku_code = s.code and d.location_id = (select id from loc) and d.cancelled_at is null and d.installed_on is null), 0) as committed,
+                 where dl.sku_code = s.code and d.location_id in (select id from loc) and d.cancelled_at is null and d.installed_on is null), 0) as committed,
        coalesce((select sum(dl.qty) from deal_lines dl join deals d on d.id = dl.deal_id
-                 where dl.sku_code = s.code and d.location_id = (select id from loc) and d.cancelled_at is null and d.installed_on > $3::date), 0) as used28
+                 where dl.sku_code = s.code and d.location_id in (select id from loc) and d.cancelled_at is null and d.installed_on > $3::date), 0) as used28
      from skus s where s.active order by s.code`,
     [locationSlug, today, since],
   );
@@ -90,6 +91,7 @@ export async function loadStock(locationSlug: string, today = todayET()): Promis
 export interface PurchaseOrderView {
   id: string;
   number: number;
+  locationName: string;
   vendor: string;
   status: "ordered" | "received" | "cancelled";
   orderedOn: string;
@@ -100,13 +102,13 @@ export interface PurchaseOrderView {
   totalCents: number;
 }
 
-export async function loadPurchaseOrders(locationSlug: string): Promise<PurchaseOrderView[]> {
+export async function loadPurchaseOrders(locationSlug: string | null): Promise<PurchaseOrderView[]> {
   const { rows } = await db().query(
-    `select po.id, po.number, po.vendor, po.status, po.ordered_on, po.expected_on, po.received_on, po.note,
+    `select po.id, po.number, loc.name as location_name, po.vendor, po.status, po.ordered_on, po.expected_on, po.received_on, po.note,
        coalesce((select jsonb_agg(jsonb_build_object('skuCode', l.sku_code, 'qty', l.qty, 'unitCostCents', l.unit_cost_cents) order by l.sku_code)
                  from purchase_order_lines l where l.po_id = po.id), '[]') as lines
      from purchase_orders po join locations loc on loc.id = po.location_id
-     where loc.slug = $1
+     where $1::text is null or loc.slug = $1
      order by case po.status when 'ordered' then 0 else 1 end, po.number desc
      limit 100`,
     [locationSlug],
@@ -114,7 +116,7 @@ export async function loadPurchaseOrders(locationSlug: string): Promise<Purchase
   return rows.map((r) => {
     const lines = (r.lines as PurchaseOrderView["lines"]).map((l) => ({ ...l, qty: Number(l.qty), unitCostCents: Number(l.unitCostCents) }));
     return {
-      id: r.id, number: Number(r.number), vendor: r.vendor, status: r.status, orderedOn: r.ordered_on, expectedOn: r.expected_on,
+      id: r.id, number: Number(r.number), locationName: r.location_name, vendor: r.vendor, status: r.status, orderedOn: r.ordered_on, expectedOn: r.expected_on,
       receivedOn: r.received_on, note: r.note, lines, totalCents: lines.reduce((s, l) => s + l.qty * l.unitCostCents, 0),
     };
   });

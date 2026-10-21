@@ -110,8 +110,8 @@ export default function PayRunView({ run, today, currentPayDate }: { run: PayRun
       </div>
 
       <section className="run-totals">
-        <Stat label="Collected this week" value={fmt(totals.collectedCents)} note={`${run.collections.length} payment${run.collections.length === 1 ? "" : "s"}`} />
-        <Stat label="Payable this week" value={fmt(totals.newlyPayableCents)} note="installed and paid in full by Thursday" tone="new" />
+        <Stat label="Collected this week" value={fmt(totals.collectedCents)} />
+        <Stat label="Payable this week" value={fmt(totals.newlyPayableCents)} tone="new" />
         <Stat label="Paid this run" value={fmt(totals.paidThisRunCents)} tone="paid" />
         <Stat label="Left to pay" value={fmt(totals.remainingCents)} tone={totals.remainingCents > 0 ? "due" : "paid"} big />
       </section>
@@ -226,7 +226,6 @@ export default function PayRunView({ run, today, currentPayDate }: { run: PayRun
           </table>
         </div>
       )}
-      <p className="muted small">Mark paid records the payout dated {longDay(paidOn)} for the full amount still due on that line.</p>
 
       <h2 className="section">Collected this week</h2>
       {run.collections.length === 0 ? (
