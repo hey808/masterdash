@@ -12,7 +12,12 @@ export default async function CommissionsPage({ searchParams }: { searchParams: 
 
   return (
     <>
-      <h1>Commissions</h1>
+      <div className="page-head">
+        <h1>Commissions</h1>
+        <div className="page-actions">
+          <a className="btn-primary page-btn" href="/forms/payout">Payout form</a>
+        </div>
+      </div>
       <nav className="tabs">
         <a href="/commissions" className={tab === "run" ? "on" : ""}>Friday pay run</a>
         <a href="/commissions?tab=all" className={tab === "all" ? "on" : ""}>All commissions</a>

@@ -34,7 +34,13 @@ export default async function LedgerPage({ searchParams }: { searchParams: { loc
 
   return (
     <>
-      <h1>Deal Ledger</h1>
+      <div className="page-head">
+        <h1>Deal Ledger</h1>
+        <div className="page-actions">
+          <a className="btn-primary page-btn" href="/forms/sale">+ Sales form</a>
+          <a className="btn-outline page-btn" href="/forms/install">Installer form</a>
+        </div>
+      </div>
       <LedgerTable rows={rows} options={options} locations={LOCATIONS.map(([slug, label]) => ({ slug, label, href: href(slug), on: slug === loc }))} />
     </>
   );

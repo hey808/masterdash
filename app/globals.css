@@ -416,3 +416,10 @@ table.payout-lines input.amt { width: 110px; padding: 4px 6px; border: 1px solid
 .payout-bar { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; gap: 18px; max-width: 1100px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 10px; background: #fff; box-shadow: 0 -6px 20px rgba(5, 44, 111, .08); }
 .payout-bar-total { margin-left: auto; font: 800 20px var(--font-display); color: var(--navy); font-variant-numeric: tabular-nums; }
 @media (max-width: 640px) { .payee-head label.check { min-width: 0; } .payee-spacer { display: none; } }
+
+/* Page title with action buttons */
+.page-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-bottom: 6px; }
+.page-head h1 { margin: 0; }
+.page-actions { display: flex; gap: 8px; margin-left: auto; }
+a.page-btn { display: inline-flex; align-items: center; padding: 7px 14px; font-size: 13.5px; text-decoration: none; }
+a.btn-primary.page-btn:hover { background: #0a3a8c; }
