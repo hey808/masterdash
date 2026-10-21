@@ -1,3 +1,4 @@
+import { attachDispositions } from "@/lib/appointments";
 import { todayET } from "@/lib/dates";
 import { loadCalendar, type CalEvent } from "@/lib/ghl";
 import { gridWindow, monthGrid, monthLabel, monthOf, shiftMonth } from "@/lib/month";
@@ -20,7 +21,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: { m
   const days = monthGrid(month);
   // The selected day: from the link if it's on this grid, else today (this month) or the 1st.
   const day = searchParams.day && days.includes(searchParams.day) ? searchParams.day : month === thisMonth ? today : `${month}-01`;
-  const { events, problems } = await loadCalendar(...gridWindow(days));
+  const cal = await loadCalendar(...gridWindow(days));
+  const problems = cal.problems;
+  const events = await attachDispositions(cal.events);
   const shown = events.filter((e: CalEvent) => days.includes(e.day) && (show === "all" || e.kind === show) && (loc === "all" || e.location === loc));
   const inMonth = shown.filter((e) => e.day.startsWith(month) && e.status !== "cancelled");
 

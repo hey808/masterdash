@@ -1,3 +1,4 @@
+import { attachDispositions } from "@/lib/appointments";
 import { shortDate, todayET } from "@/lib/dates";
 import { fmt } from "@/lib/money";
 import { homeMetrics, type PersonStat } from "@/lib/reports";
@@ -18,7 +19,7 @@ export default async function Home({ searchParams }: { searchParams: { frame?: s
   const month = monthOf(today);
   const days = monthGrid(month);
   const [m, cal] = await Promise.all([homeMetrics(today, rf ?? "2000-01-01", rt ?? today), loadCalendar(...gridWindow(days))]);
-  const gridEvents = cal.events.filter((e) => days.includes(e.day));
+  const gridEvents = await attachDispositions(cal.events.filter((e) => days.includes(e.day)));
   const todays = gridEvents.filter((e) => e.day === today && e.status !== "cancelled");
   const selected = searchParams.day && days.includes(searchParams.day) ? searchParams.day : today;
   const bankBehind = m.bankThrough != null && m.bankThrough < today;

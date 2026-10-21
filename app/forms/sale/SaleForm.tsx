@@ -4,9 +4,8 @@ import { useMemo, useState } from "react";
 import { parseMoneyInput } from "@/lib/ledger/fields";
 import type { SaleAppointment } from "@/lib/appointments";
 import type { LedgerOptions } from "@/lib/ledger/options";
-import { fmt } from "@/lib/money";
 
-type Method = "check" | "zelle" | "card" | "ach" | "cash" | "other";
+type Method = "check" | "card" | "cash" | "other";
 
 const timeOf = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" });
 
@@ -43,18 +42,15 @@ export default function SaleForm({ options, stock, today, me, appointments = [],
   const [qty, setQty] = useState<Record<string, number>>({});
   const [price, setPrice] = useState("");
   const [financed, setFinanced] = useState("");
-  const [card, setCard] = useState("");
   const [lender, setLender] = useState("");
-  const [hasDeposit, setHasDeposit] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ number: number; customer: string } | null>(null);
 
   const priceCents = parseMoneyInput(price);
   const financedCents = parseMoneyInput(financed) ?? 0;
-  const cardCents = parseMoneyInput(card) ?? 0;
-  const cashCents =
-    priceCents != null && !Number.isNaN(priceCents) && !Number.isNaN(financedCents) && !Number.isNaN(cardCents) ? priceCents - financedCents - cardCents : null;
+  // No card split here: final payment is taken at install. The deposit's method can be card.
+  const cashCents = priceCents != null && !Number.isNaN(priceCents) && !Number.isNaN(financedCents) ? priceCents - financedCents : null;
   const avail = stock[location] ?? {};
   const short = useMemo(() => (location ? Object.entries(qty).filter(([sku, q]) => q > 0 && q > (avail[sku] ?? 0)) : []), [qty, avail, location]);
 
@@ -66,9 +62,10 @@ export default function SaleForm({ options, stock, today, me, appointments = [],
     if (!location) return setError("Pick the location.");
     if (priceCents == null || Number.isNaN(priceCents)) return setError("Enter the price.");
     if (Number.isNaN(financedCents)) return setError("Financed amount isn't a valid number.");
-    if (Number.isNaN(cardCents)) return setError("Card amount isn't a valid number.");
-    const depositCents = hasDeposit ? parseMoneyInput(String(f.get("depositAmount") ?? "")) : null;
-    if (hasDeposit && (depositCents == null || Number.isNaN(depositCents))) return setError("Enter the deposit amount.");
+    // Deposit is optional: blank or $0 means none was collected.
+    const depositCents = parseMoneyInput(String(f.get("depositAmount") ?? ""));
+    if (depositCents != null && Number.isNaN(depositCents)) return setError("Deposit amount isn't a valid number.");
+    if (cashCents != null && depositCents != null && depositCents > cashCents) return setError("The deposit is more than the price minus what's financed.");
     setBusy(true);
     try {
       const res = await fetch("/api/forms/sale", {
@@ -88,9 +85,8 @@ export default function SaleForm({ options, stock, today, me, appointments = [],
           priceCents,
           appointmentId: appt?.id ?? null,
           financedPortionCents: financedCents,
-          cardPortionCents: cardCents,
           lender: financedCents > 0 ? lender || null : null,
-          deposit: hasDeposit && depositCents ? { amountCents: depositCents, method: f.get("depositMethod") as Method } : null,
+          deposit: depositCents ? { amountCents: depositCents, method: f.get("depositMethod") as Method } : null,
           installScheduledOn: f.get("installScheduledOn") || null,
           note: f.get("note") || undefined,
         }),
@@ -250,9 +246,6 @@ export default function SaleForm({ options, stock, today, me, appointments = [],
           <label>Financed amount
             <input inputMode="decimal" value={financed} onChange={(e) => setFinanced(e.target.value)} placeholder="$0" />
           </label>
-          <label>Paid by card
-            <input inputMode="decimal" value={card} onChange={(e) => setCard(e.target.value)} placeholder="$0" />
-          </label>
           {financedCents > 0 && (
             <label>Lender
               <select value={lender} onChange={(e) => setLender(e.target.value)} required>
@@ -261,29 +254,19 @@ export default function SaleForm({ options, stock, today, me, appointments = [],
               </select>
             </label>
           )}
-          <div className="computed">
-            <span className="muted">Cash</span>
-            <strong>{cashCents == null ? "—" : cashCents < 0 ? <span className="neg">more than the price</span> : fmt(cashCents, { decimals: 2 })}</strong>
-          </div>
+          <label>Deposit amount
+            <input name="depositAmount" inputMode="decimal" placeholder="$0" />
+          </label>
+          <label>Deposit method
+            <select name="depositMethod" defaultValue="check">
+              <option value="check">Check</option>
+              <option value="card">Card</option>
+              <option value="cash">Cash</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          {cashCents != null && cashCents < 0 && <p className="flash wide">Financed is more than the price.</p>}
         </div>
-        <label className="check">
-          <input type="checkbox" checked={hasDeposit} onChange={(e) => setHasDeposit(e.target.checked)} /> Collected a deposit today
-        </label>
-        {hasDeposit && (
-          <div className="grid">
-            <label>Deposit amount<input name="depositAmount" inputMode="decimal" required placeholder="$500" /></label>
-            <label>Method
-              <select name="depositMethod" defaultValue="check">
-                <option value="check">Check</option>
-                <option value="zelle">Zelle</option>
-                <option value="card">Card</option>
-                <option value="ach">ACH</option>
-                <option value="cash">Cash</option>
-                <option value="other">Other</option>
-              </select>
-            </label>
-          </div>
-        )}
       </fieldset>
 
       <fieldset>

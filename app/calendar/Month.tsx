@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { CalEvent } from "@/lib/ghl";
-import EventItem, { fmtTime } from "./EventItem";
+import EventItem, { dispositionLabel, fmtTime } from "./EventItem";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const longDay = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
@@ -78,7 +78,7 @@ export default function Month({ month, days, events, today, initialDay, compact 
               </span>
               <span className="chips">
                 {active.slice(0, shown).map((e) => (
-                  <span key={`${e.location}:${e.id}`} className={`chip k-${e.kind}`}>
+                  <span key={`${e.location}:${e.id}`} className={`chip k-${e.kind} ${e.disposition ? `o-${e.disposition.outcome}` : ""}`} title={e.disposition ? dispositionLabel(e.disposition) : undefined}>
                     <b>{fmtTime(e.start).replace(":00", "").replace(" ", "").toLowerCase()}</b> {e.title}
                   </span>
                 ))}

@@ -9,8 +9,8 @@
  */
 import { db } from "./db";
 
-export type ActivityKind = "sale" | "install" | "payout" | "funding" | "po_ordered" | "po_received" | "po_cancelled" | "adjustment";
-export const FORM_KINDS: ActivityKind[] = ["sale", "install", "payout", "funding"];
+export type ActivityKind = "sale" | "install" | "payout" | "funding" | "disposition" | "po_ordered" | "po_received" | "po_cancelled" | "adjustment";
+export const FORM_KINDS: ActivityKind[] = ["sale", "install", "payout", "funding", "disposition"];
 export const INVENTORY_KINDS: ActivityKind[] = ["po_ordered", "po_received", "po_cancelled", "adjustment"];
 
 export interface ActivityItem {
@@ -72,6 +72,18 @@ po_events as (
     and (a.after ->> 'status') in ('received', 'cancelled')
     and (a.before ->> 'status') is distinct from (a.after ->> 'status')
 ),
+-- Appointments a rep marked declined or rescheduled (closed ones show up as the sale).
+dispositions as (
+  select 'appt:' || ad.appointment_id, 'disposition', ad.updated_at, l.name, p.name,
+         null::text, null::bigint, ad.customer_name, null::bigint,
+         case ad.outcome when 'declined' then 'Declined' || coalesce(': ' || ad.reason, '')
+                         else 'Rescheduled' || coalesce(' to ' || to_char(ad.rescheduled_to, 'Mon FMDD'), '') end,
+         null::bigint, null::text, nullif(trim(ad.note), '')
+  from appointment_dispositions ad
+  left join locations l on l.id = ad.location_id
+  left join people p on p.id = ad.person_id
+  where ad.outcome in ('declined', 'rescheduled')
+),
 adjustments as (
   select ia.id::text, 'adjustment', ia.created_at, l.name, null::text,
          null::text, null::bigint, null::text, null::bigint,
@@ -84,6 +96,7 @@ select * from (
   select * from sale_install
   union all select * from po_events
   union all select * from adjustments
+  union all select * from dispositions
 ) x
 where ($1::text[] is null or kind = any($1))
   and ($2::text is null or location = (select name from locations where slug = $2) or (kind = 'payout' and location is null))

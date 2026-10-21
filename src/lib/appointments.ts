@@ -206,3 +206,23 @@ export async function recordDisposition(input: unknown, who: { personId: string 
   });
   return { ok: true };
 }
+
+/** Adds each appointment's disposition (declined / rescheduled / closed) for the calendar views. */
+export async function attachDispositions<T extends CalEvent>(events: T[]): Promise<T[]> {
+  const ids = events.filter((e) => e.kind === "sales").map((e) => e.id);
+  if (ids.length === 0) return events;
+  const { rows } = await db()
+    .query(
+      `select ad.appointment_id, ad.outcome, ad.reason, ad.rescheduled_to::text as rescheduled_to, d.number
+       from appointment_dispositions ad left join deals d on d.id = ad.deal_id where ad.appointment_id = any($1)`,
+      [ids],
+    )
+    .catch(() => ({ rows: [] as Array<Record<string, unknown>> }));
+  const by = new Map(rows.map((r) => [String(r.appointment_id), r]));
+  return events.map((e) => {
+    const r = by.get(e.id);
+    return r
+      ? { ...e, disposition: { outcome: r.outcome as Outcome, reason: (r.reason as string) ?? null, rescheduledTo: (r.rescheduled_to as string) ?? null, dealNumber: r.number == null ? null : Number(r.number) } }
+      : e;
+  });
+}

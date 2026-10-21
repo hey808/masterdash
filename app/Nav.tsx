@@ -21,6 +21,20 @@ const isOn = (href: string, path: string) => (href === "/" ? path === "/" : path
 export default function Nav({ role, name }: { role: "admin" | "sales" | "installer" | null; name: string | null }) {
   const path = usePathname();
   const [open, setOpen] = useState<string | null>(null);
+  // Phones: a hamburger opens the whole menu as a sidebar.
+  const [drawer, setDrawer] = useState(false);
+  useEffect(() => setDrawer(false), [path]);
+  useEffect(() => {
+    if (!drawer) return;
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setDrawer(false);
+    document.addEventListener("keydown", esc);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", esc);
+      document.body.style.overflow = prev;
+    };
+  }, [drawer]);
   const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -41,6 +55,44 @@ export default function Nav({ role, name }: { role: "admin" | "sales" | "install
   const userOpen = open === "__user";
   return (
     <nav ref={ref} className="mainnav">
+      <button type="button" className="nav-burger" aria-label="Menu" aria-expanded={drawer} aria-controls="nav-drawer" onClick={() => setDrawer(true)}>
+        <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M3 6h16M3 11h16M3 16h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+      </button>
+      {drawer && (
+        <div className="nav-drawer-wrap" onClick={() => setDrawer(false)}>
+          <aside id="nav-drawer" className="nav-drawer" role="dialog" aria-modal="true" aria-label="Menu" onClick={(e) => e.stopPropagation()}>
+            <div className="nav-drawer-head">
+              <span className="avatar" aria-hidden="true">{(name ?? "?").trim().charAt(0).toUpperCase()}</span>
+              <span className="nd-name">{name}</span>
+              <button type="button" className="nd-close" aria-label="Close menu" onClick={() => setDrawer(false)}>×</button>
+            </div>
+            <div className="nd-body">
+              {MENU.map((item) =>
+                "links" in item ? (
+                  <div key={item.label} className="nd-group">
+                    <div className="nd-group-label">{item.label}</div>
+                    {item.links.map((l) => (
+                      <a key={l.href} href={l.href} className={isOn(l.href, path) ? "on" : ""} aria-current={isOn(l.href, path) ? "page" : undefined}>{l.label}</a>
+                    ))}
+                  </div>
+                ) : (
+                  <a key={item.href} href={item.href} className={`nd-top ${isOn(item.href, path) ? "on" : ""}`} aria-current={isOn(item.href, path) ? "page" : undefined}>{item.label}</a>
+                ),
+              )}
+              {role === "admin" && (
+                <div className="nd-group">
+                  <div className="nd-group-label">Account</div>
+                  <a href="/team" className={path.startsWith("/team") ? "on" : ""}>Team logins</a>
+                  <a href="/me" className={path.startsWith("/me") ? "on" : ""}>See as a rep</a>
+                </div>
+              )}
+            </div>
+            <form method="post" action="/api/logout" className="nd-foot">
+              <button type="submit" className="nd-signout">Sign out</button>
+            </form>
+          </aside>
+        </div>
+      )}
       {MENU.map((item) => {
         if (!("links" in item)) {
           const on = isOn(item.href, path);

@@ -12,6 +12,7 @@ const LABEL: Record<ActivityItem["kind"], string> = {
   install: "Install",
   payout: "Payout",
   funding: "Funding",
+  disposition: "Appointment",
   po_ordered: "PO ordered",
   po_received: "PO received",
   po_cancelled: "PO cancelled",
@@ -98,6 +99,8 @@ function Line({ it }: { it: ActivityItem }) {
       return <span><strong>{it.who ?? "Someone"}</strong> installed {deal}{it.items ? <span className="muted"> · {it.items} left the warehouse</span> : null}{it.amountCents != null ? <span className="muted"> · collected</span> : null}</span>;
     case "payout":
       return <span>Paid <strong>{it.who ?? "someone"}</strong>{it.items ? <span className="muted"> · {it.items}</span> : null}</span>;
+    case "disposition":
+      return <span><strong>{it.who ?? "A rep"}</strong> · {it.customer ?? "appointment"} <span className="muted">· {it.items}</span></span>;
     case "funding":
       return <span>Funding hit on {deal}{it.items ? <span className="muted"> · {it.items}</span> : null}</span>;
     case "po_ordered":

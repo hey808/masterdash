@@ -83,7 +83,37 @@ export default async function MePage({ searchParams }: { searchParams: { person?
       {lines.length === 0 ? (
         <p className="empty">No commissions yet.</p>
       ) : (
-        <div className="tablewrap">
+        <>
+        {/* Phones: just the customer; tap for the rest. */}
+        <ul className="deal-cards">
+          {lines.map(({ d, p, status }) => (
+            <li key={`${d.id}:${p.kind}`}>
+              <details>
+                <summary>
+                  <span className="dc-name">{d.customerName}</span>
+                  <span className={`dc-dot ${status}`} aria-label={status === "payable" ? "Ready to pay" : status === "waiting" ? "Waiting" : status === "paid" ? "Paid" : "Overpaid"} />
+                </summary>
+                <dl>
+                  <div><dt>Deal</dt><dd>#{d.number}</dd></div>
+                  <div><dt>For</dt><dd>{KIND_LABEL[p.kind]}</dd></div>
+                  <div><dt>Sold</dt><dd>{shortDate(d.saleDate)}</dd></div>
+                  <div><dt>Installed</dt><dd>{d.installedOn ? shortDate(d.installedOn) : "Not yet"}</dd></div>
+                  <div><dt>Earned</dt><dd>{fmt(p.earnedCents, { decimals: 2 })}</dd></div>
+                  <div><dt>Paid</dt><dd>{fmt(p.paidCents, { decimals: 2 })}</dd></div>
+                  <div><dt>Owed</dt><dd><strong>{fmt(Math.max(0, p.openCents), { decimals: 2 })}</strong></dd></div>
+                  <div>
+                    <dt>Status</dt>
+                    <dd>
+                      <span className={`status ${status}`}>{status === "payable" ? "Ready to pay" : status === "waiting" ? "Waiting" : status === "paid" ? "Paid" : "Overpaid"}</span>
+                      {status === "waiting" && p.waitingOn && <span className="act-detail">{p.waitingOn}</span>}
+                    </dd>
+                  </div>
+                </dl>
+              </details>
+            </li>
+          ))}
+        </ul>
+        <div className="tablewrap deal-table">
           <table>
             <thead>
               <tr><th>#</th><th>Customer</th><th>For</th><th>Sold</th><th>Installed</th><th className="num">Earned</th><th className="num">Paid</th><th className="num">Owed</th><th>Status</th></tr>
@@ -110,13 +140,23 @@ export default async function MePage({ searchParams }: { searchParams: { person?
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       <h2 className="section">Payments to you</h2>
       {payouts.length === 0 ? (
         <p className="empty">No payments recorded yet.</p>
       ) : (
-        <div className="tablewrap">
+        <>
+        <ul className="pay-cards">
+          {payouts.map(({ d, x }, i) => (
+            <li key={x.id ?? i}>
+              <span className="pc-main"><strong>#{d.number} {d.customerName}</strong><span className="muted">{x.paidOn ? shortDate(x.paidOn) : "imported"} · {KIND_LABEL[x.kind]}</span></span>
+              <span className="pc-amt">{fmt(x.amountCents, { decimals: 2 })}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="tablewrap deal-table">
           <table>
             <thead>
               <tr><th>Paid</th><th>Pay run</th><th>Deal</th><th>For</th><th className="num">Amount</th></tr>
@@ -137,6 +177,7 @@ export default async function MePage({ searchParams }: { searchParams: { person?
             </tbody>
           </table>
         </div>
+        </>
       )}
     </>
   );
