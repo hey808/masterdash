@@ -27,6 +27,18 @@ export default async function Home({ searchParams }: { searchParams: { frame?: s
     <>
       <h1>Home</h1>
 
+
+      <div className="table-bar home-numbers first">
+        <HomeFrame frame={frame} from={searchParams.from ?? ""} to={searchParams.to ?? ""} />
+      </div>
+
+      <div className="home-stats">
+        <Big label="Revenue" value={fmt(m.soldCents)} href="/ledger" />
+        <Big label="Collected" value={fmt(m.collectedCents)} href="/ledger" flag={m.collectedUndated ? `${m.collectedUndated} imported payment${m.collectedUndated === 1 ? "" : "s"} dated by install day` : undefined} />
+        <Big label="Accounts receivable" value={fmt(m.receivableCents)} href="/ledger" tone={m.receivableCents > 0 ? "due" : undefined} />
+        <Big label="Expenses" value={fmt(m.expensesCents)} href="/reports" flag={bankBehind ? `Bank through ${shortDate(m.bankThrough)}` : m.bankThrough == null ? "Import bank statements" : undefined} />
+      </div>
+
       <section className="home-cal">
         <div className="home-cal-head">
           <h2 className="section">{monthLabel(month)}</h2>
@@ -42,17 +54,6 @@ export default async function Home({ searchParams }: { searchParams: { frame?: s
         )}
         <Month month={month} days={days} events={gridEvents} today={today} initialDay={selected} compact />
       </section>
-
-      <div className="table-bar home-numbers">
-        <HomeFrame frame={frame} from={searchParams.from ?? ""} to={searchParams.to ?? ""} />
-      </div>
-
-      <div className="home-stats">
-        <Big label="Revenue" value={fmt(m.soldCents)} href="/ledger" />
-        <Big label="Collected" value={fmt(m.collectedCents)} href="/ledger" flag={m.collectedUndated ? `${m.collectedUndated} imported payment${m.collectedUndated === 1 ? "" : "s"} dated by install day` : undefined} />
-        <Big label="Accounts receivable" value={fmt(m.receivableCents)} href="/ledger" tone={m.receivableCents > 0 ? "due" : undefined} />
-        <Big label="Expenses" value={fmt(m.expensesCents)} href="/reports" flag={bankBehind ? `Bank through ${shortDate(m.bankThrough)}` : m.bankThrough == null ? "Import bank statements" : undefined} />
-      </div>
 
       <div className="home-boards">
         <Board title="Top reps" rows={m.reps} unit="Sold" />

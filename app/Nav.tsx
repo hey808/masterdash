@@ -9,7 +9,7 @@ type Item = Link | { label: string; links: Link[] };
 const ADMIN_MENU: Item[] = [
   { href: "/", label: "Home" },
   { label: "Sales", links: [{ href: "/ledger", label: "Ledger" }, { href: "/commissions", label: "Commissions" }, { href: "/forms", label: "Forms" }] },
-  { label: "Operations", links: [{ href: "/calendar", label: "Calendar" }, { href: "/inventory", label: "Inventory" }, { href: "/activity", label: "Activity" }] },
+  { label: "Operations", links: [{ href: "/calendar", label: "Calendar" }, { href: "/capacity", label: "Capacity" }, { href: "/inventory", label: "Inventory" }, { href: "/activity", label: "Activity" }] },
   { label: "Finance", links: [{ href: "/bank", label: "Bank" }, { href: "/reports", label: "Reports" }] },
 ];
 const SALES_MENU: Item[] = [{ href: "/me", label: "My commissions" }, { href: "/forms/sale", label: "Sales form" }];

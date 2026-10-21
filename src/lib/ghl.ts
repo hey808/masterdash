@@ -56,6 +56,7 @@ export interface CalEvent {
   day: string;
   status: string; // confirmed, showed, noshow, cancelled, new, invalid
   assignedTo: string | null;
+  assignedUserId: string | null;
   address: string | null;
   notes: string | null;
   contactUrl: string | null;
@@ -72,7 +73,7 @@ const headers = (token: string, version: string) => ({ Authorization: `Bearer ${
 const etDay = (iso: string) =>
   new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
 
-async function users(loc: GhlLocation, token: string): Promise<Map<string, string>> {
+export async function users(loc: GhlLocation, token: string): Promise<Map<string, string>> {
   try {
     const res = await fetch(`${API}/users/?locationId=${loc.locationId}`, { headers: headers(token, "2021-07-28"), next: { revalidate: 3600 } });
     if (!res.ok) return new Map();
@@ -127,6 +128,7 @@ export async function loadCalendar(fromIso: string, toIso: string): Promise<Cale
                   day: etDay(startIso),
                   status: String(e.appointmentStatus ?? e.appoinmentStatus ?? "confirmed").toLowerCase(),
                   assignedTo: assigned ? names.get(assigned) ?? null : null,
+                  assignedUserId: assigned ?? null,
                   address: (e.address as string | undefined)?.trim() || null,
                   notes: ((e.notes ?? e.description) as string | undefined)?.trim() || null,
                   contactUrl: e.contactId ? `https://app.gohighlevel.com/v2/location/${loc.locationId}/contacts/detail/${e.contactId}` : null,
@@ -143,4 +145,12 @@ export async function loadCalendar(fromIso: string, toIso: string): Promise<Cale
   );
   const events = perLocation.flat().sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
   return { events, problems };
+}
+
+/** GoHighLevel users for a location (id → name), for matching team members to bookings. */
+export async function locationUsers(slug: GhlLocation["slug"]): Promise<Array<{ id: string; name: string }>> {
+  const loc = GHL_LOCATIONS.find((l) => l.slug === slug);
+  const token = loc ? process.env[loc.tokenEnv] : undefined;
+  if (!loc || !token) return [];
+  return [...(await users(loc, token)).entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
 }
