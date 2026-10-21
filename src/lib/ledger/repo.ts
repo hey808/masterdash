@@ -72,6 +72,7 @@ export function rowToDeal(r: Row): Deal {
     installScheduledOn: s(r.install_scheduled_on),
     installedOn: s(r.installed_on),
     cancelledAt: ts(r.cancelled_at),
+    cancelReason: (r.cancel_reason as string | null) ?? null,
     closedAt: ts(r.closed_at),
     note: s(r.note),
     lines: r.lines as Deal["lines"],

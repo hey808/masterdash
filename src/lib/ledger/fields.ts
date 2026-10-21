@@ -7,7 +7,7 @@
  */
 import { z } from "zod";
 
-export type FieldKind = "text" | "date" | "money" | "rate" | "person" | "location" | "lender" | "products" | "bool";
+export type FieldKind = "text" | "date" | "money" | "rate" | "person" | "location" | "lender" | "products" | "bool" | "cancel";
 
 export interface FieldDef {
   kind: FieldKind;
@@ -44,6 +44,8 @@ export const FIELDS = {
   installedOn: { kind: "date", label: "Installed", column: "installed_on" },
   installed: { kind: "bool", label: "Installed" },
   closed: { kind: "bool", label: "Done" },
+  /** A reason cancels the deal; null restores it. */
+  cancelled: { kind: "cancel", label: "Cancelled" },
   note: { kind: "text", label: "Note", column: "note" },
 } as const satisfies Record<string, FieldDef>;
 
@@ -78,6 +80,8 @@ export function valueSchema(key: FieldKey): z.ZodTypeAny {
       return z.array(z.object({ skuCode: z.string().min(1), qty: z.number().int().min(1).max(20) })).max(20);
     case "bool":
       return z.boolean();
+    case "cancel":
+      return z.string().trim().min(2, "Say why it was cancelled").max(500).nullable();
   }
 }
 

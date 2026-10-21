@@ -78,6 +78,8 @@ export interface Deal {
   installScheduledOn: string | null;
   installedOn: string | null;
   cancelledAt: string | null;
+  /** Why it was cancelled (required when cancelled). */
+  cancelReason?: string | null;
   closedAt: string | null;
   note: string | null;
 

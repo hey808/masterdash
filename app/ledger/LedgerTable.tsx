@@ -188,6 +188,7 @@ function rawValue(r: DerivedDeal, f: FieldKey): unknown {
     case "commissionRate": return r.commissionRate;
     case "managerRate": return r.managerRate;
     case "closed": return r.closedAt != null;
+    case "cancelled": return r.cancelReason ?? null;
   }
 }
 
@@ -233,6 +234,8 @@ export default function LedgerTable({ rows: initial, options, locations }: {
     }
   }, [frame, customFrom, customTo]);
   const [frameFrom, frameTo] = frameRange(frame, customFrom, customTo);
+  const [stageFor, setStageFor] = useState<string | null>(null);
+  const closeStage = useCallback(() => setStageFor(null), []);
   const [paymentsFor, setPaymentsFor] = useState<{ id: string; source: "customer" | "lender" } | null>(null);
   const closePayments = useCallback(() => setPaymentsFor(null), []);
   const replaceRow = useCallback((d: DerivedDeal) => setRows((rs) => rs.map((r) => (r.id === d.id ? d : r))), []);
@@ -448,6 +451,15 @@ export default function LedgerTable({ rows: initial, options, locations }: {
                   const p = pin(c.key);
                   const base = `${c.num ? "num" : ""} ${p.cls}`;
                   if (isC) return <td key={c.key} className={`${base} col-collapsed`} style={p.style} />;
+                  if (c.key === "stage") {
+                    return (
+                      <td key={c.key} className={`${base} action`} style={p.style}>
+                        <button type="button" className="cellbtn stagebtn" onClick={() => setStageFor(r.id)} title={r.stage === "cancelled" ? `Cancelled: ${r.cancelReason ?? ""}. Click to restore.` : "Change stage / cancel deal"}>
+                          {c.cell(r)}
+                        </button>
+                      </td>
+                    );
+                  }
                   if (c.key === "collectedCustomer" || c.key === "collectedLender") {
                     const source = c.key === "collectedLender" ? "lender" : "customer";
                     return (
@@ -500,6 +512,9 @@ export default function LedgerTable({ rows: initial, options, locations }: {
         </table>
         {viewRows.length === 0 && <p className="empty">No deals in this view.</p>}
       </div>
+      {stageFor && rows.find((r) => r.id === stageFor) && (
+        <StageModal deal={rows.find((r) => r.id === stageFor)!} onClose={closeStage} save={save} />
+      )}
       {paymentsFor && rows.find((r) => r.id === paymentsFor.id) && (
         <PaymentsModal deal={rows.find((r) => r.id === paymentsFor.id)!} initialSource={paymentsFor.source} onClose={closePayments} onDeal={replaceRow} />
       )}
@@ -729,5 +744,59 @@ function ProductsEditor(props: {
         <button type="button" className="linkbtn" onClick={props.onCancel}>Cancel</button>
       </div>
     </div>
+  );
+}
+
+/** Cancel a deal (with a reason) or bring a cancelled one back. Other stages follow from installs and money. */
+function StageModal({ deal, onClose, save }: { deal: DerivedDeal; onClose: () => void; save: (row: DerivedDeal, field: FieldKey, value: unknown) => Promise<SaveResult> }) {
+  const cancelled = deal.stage === "cancelled";
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const owed = Math.max(0, deal.cashDueCents) + Math.max(0, deal.fundingDueCents);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!cancelled && reason.trim().length < 2) return setError("Say why it was cancelled.");
+    setBusy(true);
+    const err = await save(deal, "cancelled", cancelled ? null : reason.trim());
+    setBusy(false);
+    if (err) return setError(err);
+    onClose();
+  }
+
+  return (
+    <Modal title={`#${deal.number} ${deal.customerName}`} onClose={onClose} width={520}>
+      <form className="pay-form" onSubmit={submit}>
+        <p className="muted">
+          Stage: <span className={`stage ${deal.stage}`}>{deal.stage}</span>
+        </p>
+        {cancelled ? (
+          <>
+            <p>Cancelled{deal.cancelledAt ? ` ${shortDate(deal.cancelledAt.slice(0, 10))}` : ""}: {deal.cancelReason ?? "no reason recorded"}</p>
+            <p className="muted">Restoring puts it back in the ledger, sets its products aside again and brings back its commissions.</p>
+          </>
+        ) : (
+          <>
+            <label>Why was it cancelled?
+              <input autoFocus value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Customer backed out, financing declined…" />
+            </label>
+            <p className="muted">
+              Cancelling releases its products back to stock, drops it from receivables and stops its commissions.
+              {deal.collectedCents > 0 ? ` ${fmt(deal.collectedCents)} was already collected on it; record any refund on the Bank tab.` : ""}
+              {deal.isInstalled ? " It's already marked installed." : ""}
+              {owed > 50 && deal.isInstalled ? ` ${fmt(owed)} is still owed on it.` : ""}
+            </p>
+          </>
+        )}
+        {error && <p className="flash">{error}</p>}
+        <div className="products-actions">
+          <button type="submit" className={cancelled ? "btn-primary" : "btn-danger"} disabled={busy}>
+            {busy ? "Saving…" : cancelled ? "Restore deal" : "Cancel deal"}
+          </button>
+          <button type="button" className="linkbtn" onClick={onClose}>Close</button>
+        </div>
+      </form>
+    </Modal>
   );
 }

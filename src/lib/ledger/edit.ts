@@ -133,6 +133,12 @@ export async function applyEdit(
         return set("updated_at = now()", []);
       }
 
+      case "cancel":
+        // A reason cancels (keeps the first cancel time); null brings the deal back.
+        return v == null
+          ? set("cancelled_at = null, cancel_reason = null", [])
+          : set("cancelled_at = coalesce(cancelled_at, now()), cancel_reason = $2", [v]);
+
       case "bool":
         if (key === "installed") {
           // Yes stamps today's date (Eastern) unless an install date is already set; No clears it.

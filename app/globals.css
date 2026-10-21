@@ -429,3 +429,10 @@ a.btn-primary.page-btn:hover { background: #0a3a8c; }
 .frame select, .frame input[type="date"] { padding: 4px 8px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font: 500 12.5px var(--font-body); color: var(--ink); }
 .frame input[type="date"] { border-radius: 6px; }
 .frame select.on { border-color: var(--blue); background: var(--mist); color: var(--navy); font-weight: 600; }
+
+/* Stage cell: click to cancel / restore */
+.stagebtn { cursor: pointer; }
+.stagebtn:hover .stage { outline: 1px solid var(--blue); outline-offset: 1px; }
+.btn-danger { padding: 6px 14px; border: 0; border-radius: 5px; background: var(--red); color: #fff; font: 600 13px var(--font-body); cursor: pointer; }
+.btn-danger:hover { background: #c40a21; }
+.cellbtn.stagebtn { text-align: left; text-decoration: none; padding: 4px 6px; }
