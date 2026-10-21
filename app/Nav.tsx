@@ -9,7 +9,7 @@ type Item = Link | { label: string; href?: string; links: Link[] };
 
 const ADMIN_MENU: Item[] = [
   { href: "/", label: "Home" },
-  { label: "Sales", href: "/sales", links: [{ href: "/sales", label: "Dashboard" }, { href: "/ledger", label: "Ledger" }, { href: "/appointments", label: "Appointments" }, { href: "/customers", label: "Customers" }, { href: "/forms", label: "Forms" }] },
+  { label: "Sales", href: "/sales", links: [{ href: "/sales", label: "Dashboard" }, { href: "/ledger", label: "Ledger" }, { href: "/appointments", label: "Appointments" }, { href: "/customers", label: "Customers" }, { href: "/forms", label: "Forms" }, { href: "/commissions", label: "Commissions" }] },
   { label: "Operations", href: "/operations", links: [{ href: "/operations", label: "Dashboard" }, { href: "/calendar", label: "Calendar" }, { href: "/inventory", label: "Inventory" }, { href: "/capacity", label: "Capacity" }, { href: "/activity", label: "Activity" }, { href: "/installs", label: "Installs" }] },
   { label: "Finance", href: "/reports", links: [{ href: "/bank", label: "Bank" }, { href: "/reports", label: "Reports" }] },
 ];
