@@ -2,13 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { DECLINE_REASONS, type Outcome } from "@/lib/appointment-types";
+import { DECLINE_REASONS, outcomeLabel, type Outcome } from "@/lib/appointment-types";
 import type { SaleAppointment } from "@/lib/appointments";
 
 const timeOf = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" });
-const shortDay = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
 
-const BADGE: Record<Outcome, string> = { declined: "Declined", rescheduled: "Rescheduled", closed: "Closed" };
 
 export default function AppointmentsView({ appointments, day, showRep }: { appointments: SaleAppointment[]; day: string; showRep: boolean }) {
   const [open, setOpen] = useState<string | null>(null);
@@ -34,10 +32,7 @@ export default function AppointmentsView({ appointments, day, showRep }: { appoi
               )}
               {outcome && (
                 <span className={`appt-badge o-${outcome}`}>
-                  {BADGE[outcome]}
-                  {outcome === "closed" && a.soldDealNumber != null ? ` · deal #${a.soldDealNumber}` : ""}
-                  {outcome === "rescheduled" && a.disposition?.rescheduledTo ? ` to ${shortDay(a.disposition.rescheduledTo)}` : ""}
-                  {outcome === "declined" && a.disposition?.reason ? `: ${a.disposition.reason}` : ""}
+                  {outcomeLabel({ outcome, reason: a.disposition?.reason ?? null, rescheduledTo: a.disposition?.rescheduledTo ?? null, dealNumber: a.soldDealNumber })}
                 </span>
               )}
             </button>
@@ -51,7 +46,8 @@ export default function AppointmentsView({ appointments, day, showRep }: { appoi
 
 function Dispose({ a, day, onDone }: { a: SaleAppointment; day: string; onDone: () => void }) {
   const router = useRouter();
-  const [choice, setChoice] = useState<"declined" | "rescheduled" | null>(a.disposition?.outcome === "closed" ? null : (a.disposition?.outcome ?? null));
+  const prior = a.disposition?.outcome;
+  const [choice, setChoice] = useState<"declined" | "rescheduled" | null>(prior === "declined" || prior === "rescheduled" ? prior : null);
   const [reason, setReason] = useState(a.disposition?.reason ?? "");
   const [note, setNote] = useState(a.disposition?.note ?? "");
   const [newDate, setNewDate] = useState(a.disposition?.rescheduledTo ?? "");
@@ -66,7 +62,7 @@ function Dispose({ a, day, onDone }: { a: SaleAppointment; day: string; onDone: 
       const res = await fetch("/api/appointments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appointmentId: a.id, day, outcome: choice, reason: choice === "declined" ? reason || null : null, note: note || null, rescheduledTo: choice === "rescheduled" ? newDate || null : null }),
+        body: JSON.stringify({ appointmentId: a.id, day, kind: "sales", outcome: choice, reason: choice === "declined" ? reason || null : null, note: note || null, rescheduledTo: choice === "rescheduled" ? newDate || null : null }),
       });
       const b = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) return setError(b.error ?? "Couldn't save.");
@@ -81,6 +77,12 @@ function Dispose({ a, day, onDone }: { a: SaleAppointment; day: string; onDone: 
 
   return (
     <div className="dispo">
+      {(a.phone || a.address) && (
+        <div className="dispo-links">
+          {a.phone && <a className="btn-outline" href={`tel:${a.phone.replace(/[^\d+]/g, "")}`}>Call</a>}
+          {a.address && <a className="btn-outline" href={`https://maps.google.com/?q=${encodeURIComponent(a.address)}`} target="_blank" rel="noreferrer">Directions</a>}
+        </div>
+      )}
       <p className="dispo-q">How did it go?</p>
       <div className="dispo-choices">
         <button type="button" className={`dispo-btn d-declined ${choice === "declined" ? "on" : ""}`} aria-pressed={choice === "declined"} onClick={() => setChoice("declined")}>Declined</button>

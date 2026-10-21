@@ -10,11 +10,11 @@ type Item = Link | { label: string; href?: string; links: Link[] };
 const ADMIN_MENU: Item[] = [
   { href: "/", label: "Home" },
   { label: "Sales", href: "/sales", links: [{ href: "/sales", label: "Dashboard" }, { href: "/appointments", label: "Appointments" }, { href: "/ledger", label: "Ledger" }, { href: "/commissions", label: "Commissions" }, { href: "/forms", label: "Forms" }] },
-  { label: "Operations", href: "/operations", links: [{ href: "/operations", label: "Dashboard" }, { href: "/calendar", label: "Calendar" }, { href: "/capacity", label: "Capacity" }, { href: "/inventory", label: "Inventory" }, { href: "/activity", label: "Activity" }] },
+  { label: "Operations", href: "/operations", links: [{ href: "/operations", label: "Dashboard" }, { href: "/installs", label: "Installs" }, { href: "/calendar", label: "Calendar" }, { href: "/capacity", label: "Capacity" }, { href: "/inventory", label: "Inventory" }, { href: "/activity", label: "Activity" }] },
   { label: "Finance", href: "/reports", links: [{ href: "/bank", label: "Bank" }, { href: "/reports", label: "Reports" }] },
 ];
 const SALES_MENU: Item[] = [{ href: "/appointments", label: "Appointments" }, { href: "/me", label: "My commissions" }, { href: "/forms/sale", label: "Sales form" }];
-const INSTALLER_MENU: Item[] = [{ href: "/me", label: "My commissions" }, { href: "/forms/install", label: "Installer form" }];
+const INSTALLER_MENU: Item[] = [{ href: "/installs", label: "Installs" }, { href: "/me", label: "My commissions" }, { href: "/forms/install", label: "Installer form" }];
 
 const isOn = (href: string, path: string) => (href === "/" ? path === "/" : path.startsWith(href));
 

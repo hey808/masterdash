@@ -76,13 +76,16 @@ po_events as (
 dispositions as (
   select 'appt:' || ad.appointment_id, 'disposition', ad.updated_at, l.name, p.name,
          null::text, null::bigint, ad.customer_name, null::bigint,
+         case when coalesce(to_jsonb(ad) ->> 'kind', 'sales') = 'install' then 'Install ' else '' end ||
          case ad.outcome when 'declined' then 'Declined' || coalesce(': ' || ad.reason, '')
-                         else 'Rescheduled' || coalesce(' to ' || to_char(ad.rescheduled_to, 'Mon FMDD'), '') end,
+                         when 'incomplete' then 'not completed' || coalesce(': ' || ad.reason, '')
+                         else case when coalesce(to_jsonb(ad) ->> 'kind', 'sales') = 'install' then 'rescheduled' else 'Rescheduled' end
+                              || coalesce(' to ' || to_char(ad.rescheduled_to, 'Mon FMDD'), '') end,
          null::bigint, null::text, nullif(trim(ad.note), '')
   from appointment_dispositions ad
   left join locations l on l.id = ad.location_id
   left join people p on p.id = ad.person_id
-  where ad.outcome in ('declined', 'rescheduled')
+  where ad.outcome in ('declined', 'rescheduled', 'incomplete')
 ),
 adjustments as (
   select ia.id::text, 'adjustment', ia.created_at, l.name, null::text,

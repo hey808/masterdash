@@ -1057,3 +1057,17 @@ table.team-cap tr.needs-slots td { background: #fffaf0; }
 .cal-cell .chip.o-closed { border-left-color: #12804e; background: #e2f6ea; }
 .cal-cell .chip.o-declined { border-left-color: #9aa8bd; background: #f1f3f7; color: #6b7a93; text-decoration: line-through; }
 .cal-cell .chip.o-rescheduled { border-left-color: #d98b00; background: #fff6e2; }
+.owes { margin: 4px 0 10px; padding: 10px 12px; border-radius: var(--radius-sm); background: #fff4dc; color: #6b4700; }
+/* Installer day view */
+.appt-item.k-install { border-left-color: #12804e; }
+.appt-item.o-completed { border-left-color: #12804e; }
+.appt-item.o-incomplete { border-left-color: var(--red); }
+.appt-badge.o-completed { background: #e2f6ea; color: #17673a; }
+.appt-badge.o-incomplete { background: #fde7ea; color: #b10a1f; }
+.appt-products { font: 600 13.5px var(--font-body); color: var(--navy); }
+.appt-collect { justify-self: start; margin-top: 4px; padding: 2px 10px; border-radius: 999px; background: #fff4dc; color: #6b4700; font: 700 12.5px var(--font-body); }
+.dispo-links { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.dispo-links .btn-outline { display: grid; place-items: center; min-height: 44px; border-radius: 10px; text-decoration: none; }
+.dispo-note { margin: 0; padding: 10px 12px; border-radius: 10px; background: #f4f8fe; font-size: 13.5px; white-space: pre-wrap; }
+.cal-cell .chip.o-completed { border-left-color: #12804e; background: #e2f6ea; }
+.cal-cell .chip.o-incomplete { border-left-color: var(--red); background: #fde7ea; }

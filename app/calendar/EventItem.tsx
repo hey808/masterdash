@@ -1,17 +1,12 @@
+import { outcomeLabel } from "@/lib/appointment-types";
 import type { CalEvent } from "@/lib/ghl";
 
 const time = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" });
 const STATUS: Record<string, string> = { showed: "Showed", noshow: "No-show", cancelled: "Cancelled", new: "Unconfirmed", invalid: "Invalid" };
 
 export const fmtTime = (iso: string) => time.format(new Date(iso));
-const shortDay = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-
-/** "Declined: Price", "Rescheduled to Oct 24", "Closed · deal #128". */
-export function dispositionLabel(d: NonNullable<CalEvent["disposition"]>): string {
-  if (d.outcome === "closed") return `Closed${d.dealNumber != null ? ` · deal #${d.dealNumber}` : ""}`;
-  if (d.outcome === "rescheduled") return `Rescheduled${d.rescheduledTo ? ` to ${shortDay(d.rescheduledTo)}` : ""}`;
-  return `Declined${d.reason ? `: ${d.reason}` : ""}`;
-}
+/** "Declined: Price", "Rescheduled to Oct 24", "Closed · deal #128", "Installed", "Not completed: …". */
+export const dispositionLabel = (d: NonNullable<CalEvent["disposition"]>) => outcomeLabel(d);
 
 /** One appointment: time, title, type, location, who; opens for address, notes and a GHL link. */
 export default function EventItem({ e, open }: { e: CalEvent; open?: boolean }) {

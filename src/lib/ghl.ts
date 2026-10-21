@@ -61,7 +61,7 @@ export interface CalEvent {
   notes: string | null;
   contactUrl: string | null;
   /** What the rep reported (from the app, not GoHighLevel); attached by attachDispositions. */
-  disposition?: { outcome: "declined" | "rescheduled" | "closed"; reason: string | null; rescheduledTo: string | null; dealNumber: number | null } | null;
+  disposition?: { outcome: "declined" | "rescheduled" | "closed" | "completed" | "incomplete"; reason: string | null; rescheduledTo: string | null; dealNumber: number | null } | null;
 }
 
 export interface CalendarResult {

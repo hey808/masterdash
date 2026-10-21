@@ -61,6 +61,8 @@ export const InstallForm = z.object({
   installedOn: date,
   collected: z.object({ amountCents: cents.refine((n) => n > 0, "Amount must be more than $0"), method }).nullable(),
   note: optText,
+  /** The GoHighLevel install appointment this came from. */
+  appointmentId: z.string().max(64).nullable().optional(),
 });
 
 const first = (e: z.ZodError) => {
@@ -163,6 +165,16 @@ export async function submitInstall(input: unknown): Promise<{ id: string; numbe
       );
     }
     await c.query("insert into form_submissions (kind, deal_id, submitted_by, payload) values ('install', $1, $2, $3)", [v.dealId, v.installerId, v]);
+    // The install appointment it came from is now done, linked to the deal.
+    const hasKind = (await c.query("select 1 from information_schema.columns where table_name = 'appointment_dispositions' and column_name = 'kind'")).rowCount;
+    if (v.appointmentId && hasKind) {
+      await c.query(
+        `insert into appointment_dispositions (appointment_id, kind, location_id, person_id, appointment_day, customer_name, outcome, deal_id, recorded_by)
+         select $1, 'install', d.location_id, $2, $3, d.customer_name, 'completed', d.id, 'form:install' from deals d where d.id = $4
+         on conflict (appointment_id) do update set outcome = 'completed', deal_id = excluded.deal_id, reason = null, rescheduled_to = null, updated_at = now()`,
+        [v.appointmentId, v.installerId, v.installedOn, v.dealId],
+      );
+    }
     return { id: d.id as string, number: Number(d.number) };
   });
 }

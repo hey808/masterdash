@@ -9,8 +9,10 @@ import { EditError } from "./ledger/edit";
 import { GHL_LOCATIONS, loadCalendar, type CalEvent, type GhlLocation } from "./ghl";
 import { addDays } from "./ledger/payrun";
 import { matchRoster } from "./person-match";
-import type { Disposition, Outcome } from "./appointment-types";
-export { DECLINE_REASONS, type Disposition, type Outcome } from "./appointment-types";
+import type { ApptKind, Disposition, Outcome } from "./appointment-types";
+import { firstLast, normName } from "./install-sync";
+import { loadLedger } from "./ledger/repo";
+export { DECLINE_REASONS, INCOMPLETE_REASONS, type Disposition, type Outcome } from "./appointment-types";
 
 const API = "https://services.leadconnectorhq.com";
 
@@ -103,22 +105,16 @@ const sourceOf = (c: Contact | null): string | null => {
  * Sales appointments on `day` (Eastern). With a personId, only that rep's
  * (matched by their GoHighLevel user's name, e.g. "Mike CF" is Mike).
  */
-export async function salesAppointments(day: string, personId: string | null): Promise<{ appointments: SaleAppointment[]; problems: Array<{ location: string; message: string }> }> {
-  const [cal, people, sold, disp] = await Promise.all([
-    loadCalendar(`${addDays(day, -1)}T12:00:00Z`, `${addDays(day, 1)}T12:00:00Z`),
-    db().query("select id, name from people where active"),
-    db()
-      .query(`select fs.payload ->> 'appointmentId' as appt, d.number from form_submissions fs join deals d on d.id = fs.deal_id where fs.kind = 'sale' and fs.payload ? 'appointmentId'`)
-      .catch(() => ({ rows: [] as Array<{ appt: string; number: number }> })),
-    db()
-      .query(
-        `select ad.appointment_id, ad.outcome, ad.reason, ad.note, ad.rescheduled_to::text, ad.updated_at, d.number
-         from appointment_dispositions ad left join deals d on d.id = ad.deal_id where ad.appointment_day between $1::date - 1 and $1::date + 1`,
-        [day],
-      )
-      .catch(() => ({ rows: [] as Array<Record<string, unknown>> })), // before the table exists
-  ]);
-  const dispBy = new Map(
+/** Dispositions for appointments on `day` (± a day for time zones), by appointment id. */
+async function dispositionsAround(day: string): Promise<Map<string, Disposition>> {
+  const disp = await db()
+    .query(
+      `select ad.appointment_id, ad.outcome, ad.reason, ad.note, ad.rescheduled_to::text, ad.updated_at, d.number
+       from appointment_dispositions ad left join deals d on d.id = ad.deal_id where ad.appointment_day between $1::date - 1 and $1::date + 1`,
+      [day],
+    )
+    .catch(() => ({ rows: [] as Array<Record<string, unknown>> })); // before the table exists
+  return new Map(
     disp.rows.map((r) => [
       String(r.appointment_id),
       {
@@ -131,6 +127,17 @@ export async function salesAppointments(day: string, personId: string | null): P
       } satisfies Disposition,
     ]),
   );
+}
+
+export async function salesAppointments(day: string, personId: string | null): Promise<{ appointments: SaleAppointment[]; problems: Array<{ location: string; message: string }> }> {
+  const [cal, people, sold, dispBy] = await Promise.all([
+    loadCalendar(`${addDays(day, -1)}T12:00:00Z`, `${addDays(day, 1)}T12:00:00Z`),
+    db().query("select id, name from people where active"),
+    db()
+      .query(`select fs.payload ->> 'appointmentId' as appt, d.number from form_submissions fs join deals d on d.id = fs.deal_id where fs.kind = 'sale' and fs.payload ? 'appointmentId'`)
+      .catch(() => ({ rows: [] as Array<{ appt: string; number: number }> })),
+    dispositionsAround(day),
+  ]);
   const roster = people.rows as Array<{ id: string; name: string }>;
   const soldBy = new Map(sold.rows.map((r) => [r.appt as string, Number(r.number)]));
   const evs = cal.events.filter((e: CalEvent) => e.kind === "sales" && e.day === day && e.status !== "cancelled" && e.status !== "invalid");
@@ -169,39 +176,131 @@ export async function salesAppointments(day: string, personId: string | null): P
   return { appointments, problems: cal.problems };
 }
 
+/* ── Install appointments ────────────────────────────────────────────── */
+
+export interface InstallAppointment {
+  id: string;
+  location: GhlLocation["slug"];
+  locationName: string;
+  start: string;
+  end: string;
+  installerPersonId: string | null;
+  installerName: string | null;
+  customerName: string;
+  address: string | null;
+  phone: string | null;
+  contactUrl: string | null;
+  /** The ledger deal this install is for (matched by customer name at the location). */
+  deal: { id: string; number: number; products: string; customerOwesCents: number; installedOn: string | null; notes: string | null } | null;
+  disposition: Disposition | null;
+}
+
+/**
+ * Install appointments on `day`. With a personId, only that installer's
+ * (their GoHighLevel user's name, e.g. "Angel M" is Angel). Each is matched to
+ * its deal the same way the install-date sync does.
+ */
+export async function installAppointments(day: string, personId: string | null): Promise<{ appointments: InstallAppointment[]; problems: Array<{ location: string; message: string }> }> {
+  const [cal, people, dispBy, deals] = await Promise.all([
+    loadCalendar(`${addDays(day, -1)}T12:00:00Z`, `${addDays(day, 1)}T12:00:00Z`),
+    db().query("select id, name from people where active"),
+    dispositionsAround(day),
+    loadLedger(day),
+  ]);
+  const roster = people.rows as Array<{ id: string; name: string }>;
+  const live = deals.filter((d) => d.stage !== "cancelled");
+  const findDeal = (title: string, location: string) => {
+    const n = normName(title);
+    const exact = live.filter((d) => d.location === location && normName(d.customerName) === n);
+    if (exact.length) return exact.find((d) => !d.isInstalled) ?? exact[0]!;
+    const fl = firstLast(title);
+    const loose = fl ? live.filter((d) => d.location === location && firstLast(d.customerName) === fl) : [];
+    return loose.length === 1 ? loose[0]! : null;
+  };
+  const evs = cal.events.filter((e) => e.kind === "install" && e.day === day && e.status !== "cancelled" && e.status !== "invalid");
+  const withWho = evs.map((e) => ({ e, who: e.assignedTo ? matchRoster(e.assignedTo, roster).person : null }));
+  const mine = personId ? withWho.filter((x) => x.who?.id === personId) : withWho;
+  const appointments = await Promise.all(
+    mine.map(async ({ e, who }): Promise<InstallAppointment> => {
+      const loc = GHL_LOCATIONS.find((l) => l.slug === e.location)!;
+      const contactId = e.contactUrl?.split("/").pop() ?? null;
+      const c = contactId ? await contact(loc, contactId) : null;
+      const d = findDeal(e.title, e.location);
+      const name = [c?.firstName, c?.lastName].filter(Boolean).join(" ").trim();
+      return {
+        id: e.id,
+        location: e.location,
+        locationName: e.locationName,
+        start: e.start,
+        end: e.end,
+        installerPersonId: who?.id ?? null,
+        installerName: who?.name ?? e.assignedTo,
+        customerName: d?.customerName ?? (name ? title(name) : title(customerFromTitle(e.title))),
+        address: d?.customerAddress ?? (c?.address1 ? [c.address1, c.city, [c.state, c.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", ") : cleanAddress(e.address)),
+        phone: formatPhone(c?.phone),
+        contactUrl: e.contactUrl,
+        deal: d
+          ? {
+              id: d.id,
+              number: d.number,
+              products: d.lines.map((l) => (l.qty > 1 ? `${l.qty}× ${l.skuCode}` : l.skuCode)).join(" + "),
+              customerOwesCents: Math.max(0, d.cashDueCents),
+              installedOn: d.installedOn,
+              notes: d.note,
+            }
+          : null,
+        disposition: dispBy.get(e.id) ?? null,
+      };
+    }),
+  );
+  appointments.sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
+  return { appointments, problems: cal.problems };
+}
+
 /* ── Dispositions ────────────────────────────────────────────────────── */
 
 export const DispositionInput = z.object({
   appointmentId: z.string().min(1).max(64),
   day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  outcome: z.enum(["declined", "rescheduled"]),
+  kind: z.enum(["sales", "install"]).default("sales"),
+  outcome: z.enum(["declined", "rescheduled", "incomplete"]),
   reason: z.string().trim().max(120).optional().nullable(),
   note: z.string().trim().max(1000).optional().nullable(),
   rescheduledTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
 });
 
 /**
- * Declined or rescheduled, as the rep reports it. A rep can only disposition
- * their own appointments; a closed one (a sale) can't be changed here.
- * (Closed is recorded by the sales form, with the deal.)
+ * Sales: declined or rescheduled. Installs: incomplete or rescheduled. People
+ * can only disposition their own appointments; a closed sale or a completed
+ * install can't be changed here (the forms record those, with the deal).
  */
 export async function recordDisposition(input: unknown, who: { personId: string | null; isAdmin: boolean; actor: string }): Promise<{ ok: true }> {
   const p = DispositionInput.safeParse(input);
   if (!p.success) throw new EditError(p.error.issues[0]?.message ?? "Check the form", 400);
   const v = p.data;
+  const allowed: Record<ApptKind, string[]> = { sales: ["declined", "rescheduled"], install: ["incomplete", "rescheduled"] };
+  if (!allowed[v.kind].includes(v.outcome)) throw new EditError("That outcome doesn't apply here.", 400);
   if (v.outcome === "rescheduled" && v.rescheduledTo && v.rescheduledTo < v.day) throw new EditError("The new date can't be before the appointment.", 400);
-  const { appointments } = await salesAppointments(v.day, who.isAdmin ? null : who.personId);
-  const a = appointments.find((x) => x.id === v.appointmentId);
-  if (!a) throw new EditError(who.isAdmin ? "That appointment isn't on the calendar that day." : "That appointment isn't on your calendar that day.", 404);
-  if (a.disposition?.outcome === "closed" || a.soldDealNumber != null) throw new EditError("This appointment already has a sale on it.", 409);
+  const scope = who.isAdmin ? null : who.personId;
+  let target: { id: string; location: string; personId: string | null; customer: string; contactId: string | null; dealId: string | null; locked: boolean } | undefined;
+  if (v.kind === "sales") {
+    const a = (await salesAppointments(v.day, scope)).appointments.find((x) => x.id === v.appointmentId);
+    if (a) target = { id: a.id, location: a.location, personId: a.repPersonId, customer: a.customerName, contactId: a.contactId, dealId: null, locked: a.disposition?.outcome === "closed" || a.soldDealNumber != null };
+  } else {
+    const a = (await installAppointments(v.day, scope)).appointments.find((x) => x.id === v.appointmentId);
+    if (a) target = { id: a.id, location: a.location, personId: a.installerPersonId, customer: a.customerName, contactId: a.contactUrl?.split("/").pop() ?? null, dealId: a.deal?.id ?? null, locked: a.disposition?.outcome === "completed" || a.deal?.installedOn != null };
+  }
+  if (!target) throw new EditError(who.isAdmin ? "That appointment isn't on the calendar that day." : "That appointment isn't on your calendar that day.", 404);
+  if (target.locked) throw new EditError(v.kind === "sales" ? "This appointment already has a sale on it." : "This install is already recorded as done.", 409);
+  const t = target;
   await tx(who.actor, async (c) => {
-    const loc = (await c.query("select id from locations where slug = $1", [a.location])).rows[0];
+    const loc = (await c.query("select id from locations where slug = $1", [t.location])).rows[0];
     await c.query(
-      `insert into appointment_dispositions (appointment_id, location_id, person_id, appointment_day, customer_name, contact_id, outcome, reason, note, rescheduled_to, recorded_by)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+      `insert into appointment_dispositions (appointment_id, kind, location_id, person_id, appointment_day, customer_name, contact_id, outcome, reason, note, rescheduled_to, deal_id, recorded_by)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
        on conflict (appointment_id) do update set outcome = excluded.outcome, reason = excluded.reason, note = excluded.note,
          rescheduled_to = excluded.rescheduled_to, recorded_by = excluded.recorded_by, updated_at = now()`,
-      [a.id, loc?.id ?? null, a.repPersonId, v.day, a.customerName, a.contactId, v.outcome, v.outcome === "declined" ? v.reason || null : null, v.note || null, v.outcome === "rescheduled" ? v.rescheduledTo || null : null, who.actor],
+      [t.id, v.kind, loc?.id ?? null, t.personId, v.day, t.customer, t.contactId, v.outcome, v.outcome === "rescheduled" ? null : v.reason || null, v.note || null, v.outcome === "rescheduled" ? v.rescheduledTo || null : null, t.dealId, who.actor],
     );
   });
   return { ok: true };
@@ -209,7 +308,7 @@ export async function recordDisposition(input: unknown, who: { personId: string 
 
 /** Adds each appointment's disposition (declined / rescheduled / closed) for the calendar views. */
 export async function attachDispositions<T extends CalEvent>(events: T[]): Promise<T[]> {
-  const ids = events.filter((e) => e.kind === "sales").map((e) => e.id);
+  const ids = events.map((e) => e.id);
   if (ids.length === 0) return events;
   const { rows } = await db()
     .query(

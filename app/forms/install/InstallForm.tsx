@@ -12,14 +12,23 @@ export interface OpenJob {
   scheduled: string | null;
   location: string;
   products: string;
+  /** What the customer still owes (cash + card portions not yet collected). */
+  owesCents: number;
 }
 
-export default function InstallForm({ jobs, people, today, me, initialDeal }: { jobs: OpenJob[]; people: Array<{ id: string; name: string; roles: string[] }>; today: string; me?: { personId: string; name: string } | null; initialDeal?: string }) {
+export default function InstallForm({ jobs, people, today, me, initialDeal, appointmentId }: {
+  jobs: OpenJob[];
+  people: Array<{ id: string; name: string; roles: string[] }>;
+  today: string;
+  me?: { personId: string; name: string } | null;
+  initialDeal?: string;
+  /** Opened from "Completed" on the installs page. */
+  appointmentId?: string;
+}) {
   const installers = [...people].sort((a, b) => Number(b.roles.includes("installer")) - Number(a.roles.includes("installer")) || a.name.localeCompare(b.name));
   const [query, setQuery] = useState("");
   // Opened from a "Record install" link: start with that job picked.
   const [picked, setPicked] = useState<OpenJob | null>(() => jobs.find((j) => j.id === initialDeal) ?? null);
-  const [collected, setCollected] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<OpenJob | null>(null);
@@ -35,8 +44,9 @@ export default function InstallForm({ jobs, people, today, me, initialDeal }: { 
     setError(null);
     if (!picked) return setError("Pick the customer from the list.");
     const f = new FormData(e.currentTarget);
-    const amount = collected ? parseMoneyInput(String(f.get("amount") ?? "")) : null;
-    if (collected && (amount == null || Number.isNaN(amount) || amount <= 0)) return setError("Enter the amount collected.");
+    // Blank or $0 = nothing collected at the install.
+    const amount = parseMoneyInput(String(f.get("amount") ?? ""));
+    if (amount != null && Number.isNaN(amount)) return setError("Amount collected isn't a valid number.");
     setBusy(true);
     try {
       const res = await fetch("/api/forms/install", {
@@ -46,8 +56,9 @@ export default function InstallForm({ jobs, people, today, me, initialDeal }: { 
           dealId: picked.id,
           installerId: f.get("installerId"),
           installedOn: f.get("installedOn"),
-          collected: collected ? { amountCents: amount, method: f.get("method") } : null,
+          collected: amount ? { amountCents: amount, method: f.get("method") } : null,
           note: f.get("note") || undefined,
+          appointmentId: appointmentId && picked.id === initialDeal ? appointmentId : null,
         }),
       });
       const b = (await res.json().catch(() => ({}))) as { error?: string };
@@ -67,7 +78,7 @@ export default function InstallForm({ jobs, people, today, me, initialDeal }: { 
         <h2>#{done.number} {done.customer} marked installed</h2>
         <p>{done.products ? `${done.products} came out of the ${done.location} warehouse count.` : "No products were on this deal."}</p>
         <div className="row-actions">
-          <a className="btn-primary big" href="/forms/install">Log another install</a>
+          {me ? <a className="btn-primary big" href="/installs">Back to my installs</a> : <a className="btn-primary big" href="/forms/install">Log another install</a>}
           {me ? <a className="linkbtn" href="/me">My commissions</a> : <a className="linkbtn" href="/ledger">Open the ledger</a>}
         </div>
       </div>
@@ -135,24 +146,24 @@ export default function InstallForm({ jobs, people, today, me, initialDeal }: { 
               )}
               <label>Install date<input name="installedOn" type="date" required defaultValue={today} max={today} /></label>
             </div>
-            <label className="check">
-              <input type="checkbox" checked={collected} onChange={(e) => setCollected(e.target.checked)} /> Collected money from the customer at the install
-            </label>
-            {collected && (
-              <div className="grid">
-                <label>Amount<input name="amount" inputMode="decimal" required placeholder="$0.00" /></label>
-                <label>Method
-                  <select name="method" defaultValue="check">
-                    <option value="check">Check</option>
-                    <option value="zelle">Zelle</option>
-                    <option value="card">Card</option>
-                    <option value="ach">ACH</option>
-                    <option value="cash">Cash</option>
-                    <option value="other">Other</option>
-                  </select>
-                </label>
-              </div>
+            {picked.owesCents > 50 ? (
+              <p className="owes">Customer still owes <strong>{(picked.owesCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}</strong> (not counting the lender).</p>
+            ) : (
+              <p className="muted small">Customer has nothing left to pay.</p>
             )}
+            <div className="grid">
+              <label>Amount collected
+                <input name="amount" inputMode="decimal" placeholder="$0" />
+              </label>
+              <label>Method
+                <select name="method" defaultValue="check">
+                  <option value="check">Check</option>
+                  <option value="card">Card</option>
+                  <option value="cash">Cash</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+            </div>
             <label className="wide">Notes<textarea name="note" rows={3} placeholder="Anything the office should know" /></label>
           </fieldset>
 

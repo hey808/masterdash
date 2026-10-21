@@ -35,9 +35,10 @@ describe("sessions", () => {
     for (const p of ["/", "/ledger", "/commissions", "/forms/install", "/api/forms/install", "/api/deals/x", "/api/payouts", "/team", "/api/users", "/bank", "/calendar", "/forms/payout", "/mex"]) {
       expect(canAccess("sales", p)).toBe(false);
     }
-    for (const p of ["/me", "/forms/install", "/api/forms/install"]) expect(canAccess("installer", p)).toBe(true);
-    for (const p of ["/forms/sale", "/api/forms/sale", "/appointments", "/api/appointments", "/ledger", "/api/payments/x"]) expect(canAccess("installer", p)).toBe(false);
+    for (const p of ["/me", "/installs", "/api/appointments", "/forms/install", "/api/forms/install"]) expect(canAccess("installer", p)).toBe(true);
+    for (const p of ["/forms/sale", "/api/forms/sale", "/appointments", "/ledger", "/api/payments/x"]) expect(canAccess("installer", p)).toBe(false);
     expect(homeFor("sales")).toBe("/appointments");
     expect(homeFor("admin")).toBe("/");
+    expect(homeFor("installer")).toBe("/installs");
   });
 });
