@@ -16,7 +16,7 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--font-body); }
 a { color: var(--blue); text-decoration: none; }
-.topbar { display: flex; align-items: center; gap: 32px; padding: 14px 24px; background: var(--navy); color: #fff; }
+.topbar { display: flex; align-items: center; gap: 28px; padding: 8px 24px; background: var(--navy); color: #fff; }
 .brand { font: 800 15px var(--font-display); letter-spacing: 0.12em; }
 .topbar nav { display: flex; gap: 22px; }
 .topbar nav a { color: #c9d8f2; font-weight: 500; }
@@ -371,3 +371,27 @@ table.statement .st-memo td:first-child { padding-left: 24px; }
 table.statement td.total { background: #f7f9fc; }
 table.statement td.neg-paren { color: #a10b1f; }
 .st-flag { color: var(--warn); font-size: 12px; font-weight: 500; }
+
+/* Top nav: Home plus grouped dropdowns */
+.topbar nav.mainnav { display: flex; gap: 6px; align-items: stretch; }
+.mainnav .navtop { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 0; border-radius: 6px; background: none; color: #c9d8f2; font: 500 15px var(--font-body); cursor: pointer; text-decoration: none; white-space: nowrap; }
+.mainnav .navtop:hover, .navgroup.open .navtop { background: rgba(255, 255, 255, .08); color: #fff; }
+.mainnav .navtop.active { color: #fff; }
+.mainnav .navtop:focus-visible { outline: 2px solid #8fc2ff; outline-offset: 1px; }
+.navcur { padding: 1px 8px; border-radius: 999px; background: rgba(255, 255, 255, .14); font-size: 12.5px; font-weight: 600; }
+.caret { font-size: 10px; opacity: .7; transition: transform .15s; }
+.navgroup { position: relative; }
+.navgroup.open .caret { transform: rotate(180deg); }
+.navmenu { position: absolute; top: 100%; left: 0; z-index: 50; min-width: 180px; padding: 6px; margin-top: 4px; border: 1px solid var(--line); border-radius: 10px; background: #fff; box-shadow: 0 10px 30px rgba(5, 44, 111, .18); display: none; }
+.navgroup.open .navmenu { display: block; }
+.navmenu::before { content: ""; position: absolute; left: 0; right: 0; top: -8px; height: 8px; }
+.topbar .navmenu a { display: block; padding: 8px 12px; border-radius: 6px; color: var(--ink); font: 500 14px var(--font-body); text-decoration: none; }
+.topbar .navmenu a:hover { background: var(--mist); color: var(--navy); }
+.topbar .navmenu a.active { background: var(--mist); color: var(--navy); font-weight: 700; }
+.brand { white-space: nowrap; }
+@media (max-width: 640px) {
+  .topbar { flex-wrap: wrap; gap: 4px 12px; padding: 8px 12px; }
+  .topbar nav.mainnav { flex-wrap: wrap; gap: 2px; }
+  .mainnav .navtop { padding: 7px 9px; font-size: 14px; }
+  .navcur { display: none; }
+}
