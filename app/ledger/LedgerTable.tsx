@@ -54,9 +54,9 @@ const COLUMNS: Col[] = [
   { key: "fees", label: "Fees", ...money((r) => r.feesCents) },
   { key: "net", label: "Net Revenue", ...money((r) => r.netRevenueCents) },
   { key: "collectedCustomer", label: "Collected - Customer", ...money((r) => r.cashCollectedCents) },
-  { key: "custOwes", label: "Customer Owes", ...money((r) => r.cashDueCents, (r) => Math.max(0, r.cashDueCents)), cellClass: (r) => (r.cashDueCents < 0 ? "neg" : "") },
+  { key: "custOwes", label: "Customer Outstanding", ...money((r) => r.cashDueCents, (r) => Math.max(0, r.cashDueCents)), cellClass: (r) => (r.cashDueCents < 0 ? "neg" : "") },
   { key: "collectedLender", label: "Collected - Lender", ...money((r) => r.fundedCents) },
-  { key: "lenderOwes", label: "Lender Owes", ...money((r) => r.fundingDueCents, (r) => Math.max(0, r.fundingDueCents)), cellClass: (r) => (r.fundingDueCents < 0 ? "neg" : "") },
+  { key: "lenderOwes", label: "Lender Outstanding", ...money((r) => r.fundingDueCents, (r) => Math.max(0, r.fundingDueCents)), cellClass: (r) => (r.fundingDueCents < 0 ? "neg" : "") },
   {
     key: "outstanding",
     label: "Total Outstanding",

@@ -53,8 +53,8 @@ export default function PaymentsModal({ deal, initialSource, onClose, onDeal }: 
       <div className="pay-summary">
         <span>Price <strong>{fmt(deal.priceCents)}</strong></span>
         <span>Collected <strong>{fmt(deal.collectedCents)}</strong></span>
-        <span>Customer owes <strong>{fmt(deal.cashDueCents)}</strong></span>
-        <span>Lender owes <strong>{fmt(deal.fundingDueCents)}</strong></span>
+        <span>Customer outstanding <strong>{fmt(deal.cashDueCents)}</strong></span>
+        <span>Lender outstanding <strong>{fmt(deal.fundingDueCents)}</strong></span>
       </div>
 
       {deal.payments.length === 0 ? (
