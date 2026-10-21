@@ -18,8 +18,8 @@ export default function AgreementForm({ draft, reps, me, lenders, today }: {
   const [systems, setSystems] = useState<string[]>(draft.systems);
   const [equipment, setEquipment] = useState<string[]>(draft.equipment);
   const [newItem, setNewItem] = useState("");
-  const [soap, setSoap] = useState<SoapPackage>("none");
-  const [plan, setPlan] = useState(false);
+  const [soap, setSoap] = useState<SoapPackage>(draft.soapPackage);
+  const [plan, setPlan] = useState(draft.maintenancePlan);
   const [financed, setFinanced] = useState(dollars(draft.financedCents || null));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -43,6 +43,8 @@ export const FIELDS = {
   installScheduledOn: { kind: "date", label: "Install scheduled", column: "install_scheduled_on" },
   installedOn: { kind: "date", label: "Installed", column: "installed_on" },
   installed: { kind: "bool", label: "Installed" },
+  soap: { kind: "bool", label: "Soap" },
+  maintenanceArrCents: { kind: "money", label: "Maintenance (ARR)", column: "maintenance_arr_cents", required: true },
   closed: { kind: "bool", label: "Done" },
   /** A reason cancels the deal; null restores it. */
   cancelled: { kind: "cancel", label: "Cancelled" },

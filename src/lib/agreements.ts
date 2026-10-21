@@ -9,7 +9,7 @@ import { createHash, randomBytes, randomInt } from "node:crypto";
 import { z } from "zod";
 import { db, tx } from "./db";
 import { EditError } from "./ledger/edit";
-import { SOAP_PACKAGES, SYSTEMS, TERMS_VERSION, initialsOf, termsText, type SoapPackage } from "./agreement-terms";
+import { MAINTENANCE_PLAN, SOAP_PACKAGES, SYSTEMS, TERMS_VERSION, initialsOf, termsText, type SoapPackage } from "./agreement-terms";
 
 export interface Agreement {
   id: string;
@@ -218,7 +218,17 @@ export async function createAgreement(input: unknown, actor: string): Promise<{ 
           v.depositCents, v.depositCents > 0 ? v.depositMethod : null, v.installDate ?? null, v.notes, v.installerNotes, initialsOf(rep.name), TERMS_VERSION, termsText(), actor,
         ],
       );
-      if (r.rows[0]) return { id: r.rows[0].id as string, token, number };
+      if (r.rows[0]) {
+        // The contract decides the deal's soap and maintenance plan (ledger columns).
+        if (v.dealId) {
+          await c.query("update deals set soap = $2, maintenance_arr_cents = $3, updated_at = now() where id = $1", [
+            v.dealId,
+            v.soapPackage !== "none",
+            v.maintenancePlan ? MAINTENANCE_PLAN.priceCents : 0,
+          ]);
+        }
+        return { id: r.rows[0].id as string, token, number };
+      }
     }
     throw new EditError("Couldn't number the agreement. Try again.", 409);
   });

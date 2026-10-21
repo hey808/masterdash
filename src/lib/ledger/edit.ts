@@ -163,6 +163,7 @@ export async function applyEdit(
           // Yes stamps today's date (Eastern) unless an install date is already set; No clears it.
           return set("installed_on = case when $2::boolean then coalesce(installed_on, $3::date) else null end", [v, todayET()]);
         }
+        if (key === "soap") return set("soap = $2", [v]);
         return set("closed_at = case when $2::boolean then coalesce(closed_at, now()) else null end", [v]);
     }
   }

@@ -55,6 +55,8 @@ const COLUMNS: Col[] = [
   { key: "manager", label: "Manager", field: "manager", cell: (r) => r.manager?.name ?? "" },
   { key: "sold", label: "Sold Date", field: "saleDate", cell: (r) => shortDate(r.saleDate) },
   { key: "products", label: "Products", field: "products", cell: (r) => productsText(r.lines) || <span className="muted">none</span> },
+  { key: "soap", label: "Soap", field: "soap", cell: (r) => (r.soap ? "Yes" : "No") },
+  { key: "arr", label: "Maintenance (ARR)", field: "maintenanceArrCents", ...money((r) => r.maintenanceArrCents) },
   { key: "price", label: "Price", field: "priceCents", ...money((r) => r.priceCents) },
   { key: "cash", label: "Cash", field: "cashPortionCents", ...money((r) => r.cashPortionCents) },
   { key: "card", label: "Card", field: "cardPortionCents", ...money((r) => r.cardPortionCents) },
@@ -101,7 +103,7 @@ const COLUMNS: Col[] = [
 ];
 
 /** Column views. Each view starts from its preset; tweaks are remembered per view in this browser. */
-const CONSOLIDATED = ["location", "sold", "price", "cash", "card", "financed", "lenderFee", "cardFee", "collectedCustomer", "collectedLender", "outstanding", "scheduled", "installed", "profit"];
+const CONSOLIDATED = ["location", "sold", "soap", "arr", "price", "cash", "card", "financed", "lenderFee", "cardFee", "collectedCustomer", "collectedLender", "outstanding", "scheduled", "installed", "profit"];
 const RECEIVABLES = ["location", "closer", "sold", "lender", "installed", "daysOut", "price", "collectedCustomer", "custOwes", "collectedLender", "lenderOwes", "outstanding"];
 const only = (keep: string[]) => COLUMNS.filter((c) => !c.fixed && !keep.includes(c.key)).map((c) => c.key);
 
@@ -130,7 +132,7 @@ const VIEWS: Record<"consolidated" | "receivables" | "all", ViewDef> = {
 };
 type ViewKey = keyof typeof VIEWS;
 const DEFAULT_VIEW: ViewKey = "consolidated";
-const viewStorage = (v: ViewKey) => `ledger.view.${v}.collapsed.v4`; // v4: Card, Lender Fee ($), Card Fee columns; v3: Missing + Days Since Install Date columns; v2: Total Outstanding + Collected - Lender in Consolidated
+const viewStorage = (v: ViewKey) => `ledger.view.${v}.collapsed.v5`; // v5: Soap, Maintenance (ARR); v4: Card, Lender Fee ($), Card Fee columns; v3: Missing + Days Since Install Date columns; v2: Total Outstanding + Collected - Lender in Consolidated
 const NUM_W = 56;
 const STAGE_W = 148;
 const COLLAPSED_W = 28;
@@ -151,6 +153,8 @@ function rawValue(r: DerivedDeal, f: FieldKey): unknown {
     case "installScheduledOn": return r.installScheduledOn ?? "";
     case "installedOn": return r.installedOn ?? "";
     case "installed": return r.installedOn != null;
+    case "soap": return r.soap;
+    case "maintenanceArrCents": return r.maintenanceArrCents;
     case "products": return r.lines.map((l) => ({ skuCode: l.skuCode, qty: l.qty }));
     case "priceCents": return r.priceCents;
     case "cashPortionCents": return r.cashPortionCents;
@@ -536,7 +540,7 @@ function EditableCell(props: {
     const checked = rawValue(row, field) as boolean;
     const label = FIELDS[field].label;
     const tip = error ?? (field === "installed" && row.installedOn ? `Installed ${row.installedOn}` : undefined);
-    if (field === "installed") {
+    if (field === "installed" || field === "soap") {
       return (
         <td className={`${className} editable ${saving ? "saving" : ""} ${error ? "cell-error" : ""}`} style={style} title={tip}>
           <button

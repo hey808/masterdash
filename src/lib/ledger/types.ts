@@ -71,6 +71,10 @@ export interface Deal {
   adminFeeCents: Cents;
   extrasCents: Cents;
   installerPayCents: Cents | null;
+  /** Soap package included (yes/no; the tier is on the agreement). */
+  soap: boolean;
+  /** Annual General Maintenance Plan as annual recurring revenue; 0 = no plan. */
+  maintenanceArrCents: Cents;
 
   loanInterestOverrideCents: Cents | null;
   cardFeeOverrideCents: Cents | null;

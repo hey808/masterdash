@@ -53,6 +53,8 @@ export function rowToDeal(r: Row): Deal {
     priceCents: Number(r.price_cents),
     cashPortionCents: Number(r.cash_portion_cents),
     cardPortionCents: Number(r.card_portion_cents ?? 0),
+    soap: !!r.soap,
+    maintenanceArrCents: Number(r.maintenance_arr_cents ?? 0),
     financedPortionCents: Number(r.financed_portion_cents),
     splitException: s(r.split_exception),
     lender: s(r.lender_name),

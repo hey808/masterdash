@@ -84,6 +84,8 @@ export default function SaleForm({ options, stock, today, me, appointments = [],
           products,
           priceCents,
           appointmentId: appt?.id ?? null,
+          soap: f.get("soap") === "on",
+          maintenancePlan: f.get("maintenancePlan") === "on",
           financedPortionCents: financedCents,
           lender: financedCents > 0 ? lender || null : null,
           deposit: depositCents ? { amountCents: depositCents, method: f.get("depositMethod") as Method } : null,
@@ -268,12 +270,14 @@ export default function SaleForm({ options, stock, today, me, appointments = [],
           </label>
           {cashCents != null && cashCents < 0 && <p className="flash wide">Financed is more than the price.</p>}
         </div>
+        <label className="agr-toggle"><input type="checkbox" name="soap" /><span><strong>Soap package</strong><span className="muted"> The tier goes on the agreement.</span></span></label>
+        <label className="agr-toggle"><input type="checkbox" name="maintenancePlan" /><span><strong>Annual maintenance plan</strong><span className="muted"> $300/year: one service visit and salt delivery.</span></span></label>
       </fieldset>
 
       <fieldset>
         <legend>Install</legend>
         <div className="grid">
-          <label>Install scheduled for<input name="installScheduledOn" type="date" min={today} /></label>
+          <label>Install scheduled for<input name="installScheduledOn" type="date" required min={today} /></label>
           <label className="wide">Notes<textarea name="note" rows={3} /></label>
         </div>
       </fieldset>

@@ -71,6 +71,22 @@ describe.skipIf(!url)("customer agreements (database)", () => {
     await expect(signAgreement(b.token, { firstName: "T", lastName: "B", phone: "8435550100", initials: "TB", signature: SIG, consent: true }, { ip: null, userAgent: null })).rejects.toThrow(/cancelled/);
   });
 
+  it("the contract sets the deal's soap and maintenance plan (ledger columns), and a new one starts from them", async () => {
+    const deal = (await db().query("select id from deals where cancelled_at is null order by number desc limit 1")).rows[0].id as string;
+    await createAgreement({ ...base(), dealId: deal, soapPackage: "premium", maintenancePlan: true }, "test");
+    let d = (await db().query("select soap, maintenance_arr_cents from deals where id = $1", [deal])).rows[0];
+    expect(d.soap).toBe(true);
+    expect(Number(d.maintenance_arr_cents)).toBe(30000);
+    const { draftFromDeal } = await import("./agreement-prefill");
+    const draft = (await draftFromDeal(deal))!;
+    expect(draft.maintenancePlan).toBe(true);
+    expect(draft.soapPackage).not.toBe("none");
+    await createAgreement({ ...base(), dealId: deal, soapPackage: "none", maintenancePlan: false }, "test");
+    d = (await db().query("select soap, maintenance_arr_cents from deals where id = $1", [deal])).rows[0];
+    expect(d.soap).toBe(false);
+    expect(Number(d.maintenance_arr_cents)).toBe(0);
+  });
+
   it("an unknown or malformed link finds nothing", async () => {
     expect(await loadAgreementByToken("x")).toBeNull();
     expect(await loadAgreementByToken("A".repeat(32))).toBeNull();

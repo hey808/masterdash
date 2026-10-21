@@ -11,6 +11,7 @@
  * lands in the audit log under the form's actor.
  */
 import { z } from "zod";
+import { MAINTENANCE_PLAN } from "./agreement-terms";
 import { tx } from "./db";
 import { EditError } from "./ledger/edit";
 import { assertPayoutFits } from "./ledger/money-events";
@@ -41,9 +42,11 @@ export const SaleForm = z
     cardPortionCents: cents.optional().default(0),
     /** The GoHighLevel appointment this sale came from (kept on the form submission). */
     appointmentId: z.string().max(64).nullable().optional(),
+    soap: z.boolean().optional().default(false),
+    maintenancePlan: z.boolean().optional().default(false),
     lender: z.string().min(1).nullable(),
     deposit: z.object({ amountCents: cents.refine((n) => n > 0, "Deposit amount must be more than $0"), method }).nullable(),
-    installScheduledOn: date.nullable(),
+    installScheduledOn: z.string({ required_error: "Pick the install date", invalid_type_error: "Pick the install date" }).regex(/^\d{4}-\d{2}-\d{2}$/, "Pick the install date"),
     note: optText,
   })
   .superRefine((v, ctx) => {
@@ -101,14 +104,14 @@ export async function submitSale(input: unknown): Promise<{ id: string; number: 
       `insert into deals (location_id, customer_name, customer_address, customer_phone, customer_email, sale_date, lead_source,
          closer_id, manager_id, setter_id, price_cents, cash_portion_cents, financed_portion_cents, lender_id,
          comp_plan_id, lender_rate, commission_rate, manager_rate, setter_rate, canvasser_rate, admin_fee_cents,
-         install_scheduled_on, note, card_portion_cents)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+         install_scheduled_on, note, card_portion_cents, soap, maintenance_arr_cents)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
        returning id, number`,
       [
         loc.id, v.customerName, v.customerAddress, v.customerPhone, v.customerEmail, v.saleDate, v.leadSource,
         v.closerId, manager?.id ?? null, v.setterId ?? null, v.priceCents, v.priceCents - v.financedPortionCents - v.cardPortionCents, v.financedPortionCents, lenderId,
         plan.id, lenderRate, rate, isManagerOwnDeal ? 0 : Number(plan.manager_rate), v.setterId ? Number(plan.setter_rate) : 0,
-        Number(plan.canvasser_rate), Number(plan.admin_fee_cents), v.installScheduledOn, v.note, v.cardPortionCents,
+        Number(plan.canvasser_rate), Number(plan.admin_fee_cents), v.installScheduledOn, v.note, v.cardPortionCents, v.soap, v.maintenancePlan ? MAINTENANCE_PLAN.priceCents : 0,
       ],
     );
     const deal = rows[0] as { id: string; number: number };

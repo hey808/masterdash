@@ -27,6 +27,8 @@ function deal(over: Partial<Deal> = {}): Deal {
     priceCents: 799500,
     cashPortionCents: 0,
     cardPortionCents: 0,
+    soap: false,
+    maintenanceArrCents: 0,
     financedPortionCents: 799500,
     splitException: null,
     lender: "ISPC",

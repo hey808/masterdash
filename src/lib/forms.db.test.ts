@@ -56,7 +56,7 @@ describe.skipIf(!url)("forms and inventory (database)", () => {
   it("the manager's own sale carries no override", async () => {
     const r = await submitSale({
       closerId: mike, location: LOC, customerName: "Mike Own", customerAddress: "2 Ocean Blvd", saleDate: "2026-10-20",
-      products: [{ skuCode: "PWF", qty: 1 }], priceCents: 300000, financedPortionCents: 300000, lender: "ISPC", deposit: null, installScheduledOn: null,
+      products: [{ skuCode: "PWF", qty: 1 }], priceCents: 300000, financedPortionCents: 300000, lender: "ISPC", deposit: null, installScheduledOn: "2026-10-28",
     });
     const d = (await loadDeal(r.id))!;
     expect(d.managerRate).toBe(0);
@@ -66,7 +66,7 @@ describe.skipIf(!url)("forms and inventory (database)", () => {
 
   it("rejects a financed sale with no lender", async () => {
     await expect(
-      submitSale({ closerId: brock, location: LOC, customerName: "No Lender", customerAddress: "3 Ocean Blvd", saleDate: "2026-10-20", products: [{ skuCode: "RO", qty: 1 }], priceCents: 100000, financedPortionCents: 100000, lender: null, deposit: null, installScheduledOn: null }),
+      submitSale({ closerId: brock, location: LOC, customerName: "No Lender", customerAddress: "3 Ocean Blvd", saleDate: "2026-10-20", products: [{ skuCode: "RO", qty: 1 }], priceCents: 100000, financedPortionCents: 100000, lender: null, deposit: null, installScheduledOn: "2026-10-28" }),
     ).rejects.toThrow(/lender/i);
   });
 

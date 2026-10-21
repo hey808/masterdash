@@ -1155,3 +1155,21 @@ table.team-cap tr.needs-slots td { background: #fffaf0; }
   .sign-card .grid { grid-template-columns: 1fr; }
   .sign-head h1 { font-size: 21px; }
 }
+
+/* Day breakdown: one appointment per row, short and full-width */
+.cal-daypanel ul { display: grid; gap: 6px; overflow: visible; padding-bottom: 0; scroll-snap-type: none; }
+.cal-daypanel ul > li { flex: none; }
+.cal-daypanel .cal-ev summary { grid-template-columns: 150px minmax(0, 1fr) auto; align-items: center; gap: 4px 14px; padding: 7px 12px; }
+.cal-daypanel .cal-ev .t { white-space: nowrap; }
+.cal-daypanel .cal-ev .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-daypanel .cal-ev .meta { justify-content: flex-end; white-space: nowrap; }
+.cal-daypanel .cal-ev .appt-badge { grid-column: 2 / -1; margin-top: 0; justify-self: start; }
+.cal-daypanel .cal-more { padding: 0 12px 10px 176px; }
+@media (max-width: 760px) {
+  .cal-daypanel ul > li { flex-basis: auto; }
+  .cal-daypanel .cal-ev summary { grid-template-columns: 1fr; gap: 2px; padding: 8px 10px; }
+  .cal-daypanel .cal-ev .title { white-space: normal; }
+  .cal-daypanel .cal-ev .meta { justify-content: flex-start; flex-wrap: wrap; white-space: normal; }
+  .cal-daypanel .cal-ev .appt-badge { grid-column: auto; }
+  .cal-daypanel .cal-more { padding: 0 10px 10px; }
+}

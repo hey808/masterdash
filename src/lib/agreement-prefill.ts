@@ -2,7 +2,7 @@
  * What a new agreement starts with: from a deal (after the sales form) or a
  * GoHighLevel appointment. Every field stays editable by the rep.
  */
-import { SYSTEMS } from "./agreement-terms";
+import { SYSTEMS, type SoapPackage } from "./agreement-terms";
 import { salesAppointments } from "./appointments";
 import { db } from "./db";
 
@@ -30,11 +30,13 @@ export interface AgreementDraft {
   depositMethod: string | null;
   installDate: string | null;
   notes: string;
+  soapPackage: SoapPackage;
+  maintenancePlan: boolean;
 }
 
 export const emptyDraft = (): AgreementDraft => ({
   dealId: null, dealNumber: null, appointmentId: null, location: null, repId: null, firstName: "", lastName: "", address: "", unit: "", city: "", state: "", zip: "",
-  phone: "", email: "", systems: [], equipment: [], priceCents: null, financedCents: 0, lender: null, depositCents: 0, depositMethod: null, installDate: null, notes: "",
+  phone: "", email: "", systems: [], equipment: [], priceCents: null, financedCents: 0, lender: null, depositCents: 0, depositMethod: null, installDate: null, notes: "", soapPackage: "none", maintenancePlan: false,
 });
 
 /** "Paul & Paris Crane" → first "Paul & Paris", last "Crane". */
@@ -96,7 +98,7 @@ export function systemsFromProducts(names: string[]): string[] {
 export async function draftFromDeal(dealId: string): Promise<AgreementDraft | null> {
   const { rows } = await db().query(
     `select d.id, d.number, l.slug as location, d.closer_id, d.customer_name, d.customer_address, d.customer_phone, d.customer_email,
-            d.price_cents, d.financed_portion_cents, le.name as lender, d.install_scheduled_on::text as install_on, d.note,
+            d.price_cents, d.financed_portion_cents, d.soap, d.maintenance_arr_cents, le.name as lender, d.install_scheduled_on::text as install_on, d.note,
             coalesce((select sum(p.amount_cents) from payments p where p.deal_id = d.id and p.source = 'customer'), 0) as deposit,
             (select p.method from payments p where p.deal_id = d.id and p.source = 'customer' order by p.amount_cents desc limit 1) as deposit_method,
             coalesce((select array_agg(case when x.qty > 1 then x.qty || '× ' || s.name else s.name end order by x.sort) from deal_lines x join skus s on s.code = x.sku_code where x.deal_id = d.id), '{}') as equipment
@@ -129,6 +131,9 @@ export async function draftFromDeal(dealId: string): Promise<AgreementDraft | nu
     depositMethod: ["check", "card", "cash", "other"].includes(r.deposit_method) ? r.deposit_method : Number(r.deposit) > 0 ? "other" : null,
     installDate: r.install_on,
     notes: r.note ?? "",
+    // The deal only knows yes/no for soap; the rep picks the tier.
+    soapPackage: r.soap ? "standard" : "none",
+    maintenancePlan: Number(r.maintenance_arr_cents) > 0,
   };
 }
 
