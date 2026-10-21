@@ -108,6 +108,16 @@ export function fingerprints(accountLast4: string, lines: ParsedLine[]): string[
   });
 }
 
+/** Bank tables not created yet (migration not applied): read as empty instead of failing the page. */
+async function orEmpty<T>(q: () => Promise<T[]>): Promise<T[]> {
+  try {
+    return await q();
+  } catch (e) {
+    if ((e as { code?: string }).code === "42P01") return [];
+    throw e;
+  }
+}
+
 /* ── Rules ───────────────────────────────────────────────────────────── */
 
 export function matchRule(line: Pick<ParsedLine, "description" | "bankCategory" | "amountCents">, rules: Rule[]): Rule | null {
@@ -131,8 +141,7 @@ async function loadRules(client: pg.Pool | pg.PoolClient = db()): Promise<Rule[]
 }
 
 export async function loadCategories(): Promise<BankCategory[]> {
-  const { rows } = await db().query("select slug, name, kind from bank_categories order by sort");
-  return rows;
+  return orEmpty(async () => (await db().query("select slug, name, kind from bank_categories order by sort")).rows);
 }
 
 /* ── Import ──────────────────────────────────────────────────────────── */
@@ -225,7 +234,7 @@ export interface BankTxn {
 }
 
 export async function loadTransactions(f: { from?: string | null; to?: string | null } = {}): Promise<BankTxn[]> {
-  const { rows } = await db().query(
+  return orEmpty(async () => (await db().query(
     `select t.id, a.name as account, t.posted_on as "postedOn", t.txn_on as "txnOn", t.description, t.merchant,
             t.bank_category as "bankCategory", t.check_no as "checkNo", t.amount_cents as "amountCents",
             t.category, c.kind, t.category_source as "categorySource", t.needs_review as "needsReview", t.note
@@ -233,8 +242,7 @@ export async function loadTransactions(f: { from?: string | null; to?: string | 
      where ($1::date is null or t.posted_on >= $1) and ($2::date is null or t.posted_on <= $2)
      order by t.posted_on desc, t.amount_cents asc, t.id`,
     [f.from ?? null, f.to ?? null],
-  );
-  return rows;
+  )).rows);
 }
 
 export interface AccountBalance {
@@ -250,7 +258,7 @@ export interface AccountBalance {
 
 /** Each account's bank-reported balance at the end of `onOrBefore` (latest posted day ≤ that date). */
 export async function accountBalances(onOrBefore: string): Promise<AccountBalance[]> {
-  const { rows } = await db().query(
+  return orEmpty(async () => (await db().query(
     `select a.id as "accountId", a.name, a.last4,
        (select t.balance_cents from bank_transactions t where t.account_id = a.id and t.posted_on <= $1 and t.balance_cents is not null
          order by t.posted_on desc limit 1) as "balanceCents",
@@ -259,8 +267,7 @@ export async function accountBalances(onOrBefore: string): Promise<AccountBalanc
        (select max(t.posted_on) from bank_transactions t where t.account_id = a.id) as "lastOn"
      from bank_accounts a order by a.name`,
     [onOrBefore],
-  );
-  return rows;
+  )).rows);
 }
 
 /** Bank balance at the start of `day`: end-of-day balance of the first posted day ≥ day, minus that day's movement. */

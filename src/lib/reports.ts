@@ -57,7 +57,7 @@ function line(key: string, label: string, values: number[], opts: Omit<Statement
   return { key, label, values, total: sumCents(values), ...opts };
 }
 const heading = (key: string, label: string, n: number): StatementLine => ({ key, label, values: new Array(n).fill(0), total: 0, style: "heading" });
-const add = (...ls: StatementLine[]) => ls[0]!.values.map((_, i) => sumCents(ls.map((l) => l.values[i] ?? 0)));
+const sumLines = (n: number, ls: StatementLine[]) => Array.from({ length: n }, (_, i) => sumCents(ls.map((l) => l.values[i] ?? 0)));
 const neg = (v: number[]) => v.map((x) => -x);
 
 function byMonth<T>(items: T[], months: string[], when: (t: T) => string | null, amount: (t: T) => number): number[] {
@@ -91,6 +91,7 @@ export async function buildStatements(today: string): Promise<Statements> {
   const first = bankFrom ? `${month(bankFrom)}-01` : `${month(today)}-01`;
   const months = monthsBetween(first, today);
   const n = months.length;
+  const add = (...ls: StatementLine[]) => sumLines(n, ls);
   const flags: string[] = [];
 
   /* ── Income statement ── */
@@ -167,8 +168,8 @@ export async function buildStatements(today: string): Promise<Statements> {
   const fin = group(["financing"]);
   const xfer = group(["transfer"]);
   const netOp = line("cf-netop", "Net cash from operations", add(...opIn, ...opOut), { style: "subtotal" });
-  const netFin = line("cf-netfin", "Net cash from financing", fin.length ? add(...fin) : new Array(n).fill(0), { style: "subtotal" });
-  const netX = line("cf-netx", "Net transfers", xfer.length ? add(...xfer) : new Array(n).fill(0), { style: "subtotal" });
+  const netFin = line("cf-netfin", "Net cash from financing", add(...fin), { style: "subtotal" });
+  const netX = line("cf-netx", "Net transfers", add(...xfer), { style: "subtotal" });
   const change = line("cf-change", "Net change in cash", add(netOp, netFin, netX), { style: "subtotal" });
   const openL: StatementLine = { key: "cf-open", label: "Cash at start", values: opening, total: opening[0] ?? 0, style: "subtotal" };
   const computedClose = opening.map((o, i) => o + (change.values[i] ?? 0));
