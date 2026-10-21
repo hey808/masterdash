@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useRef, useState } from "react";
+import { sortTxns, type BankSort } from "@/lib/bank-export";
 import type { AccountBalance, BankCategory, BankTxn, ImportResult } from "@/lib/bank";
 import { shortDate } from "@/lib/dates";
 import { fmt, sumCents } from "@/lib/money";
@@ -26,6 +27,10 @@ export default function BankView({ txns, categories, balances }: { txns: BankTxn
   const [filter, setFilter] = useState<Filter>(txns.some((t) => t.needsReview) ? "review" : "all");
   const [cat, setCat] = useState<string>("");
   const [q, setQ] = useState("");
+  const [exportOpen, setExportOpen] = useState(false);
+  const [sort, setSort] = useState<BankSort>("date-desc");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
@@ -33,11 +38,14 @@ export default function BankView({ txns, categories, balances }: { txns: BankTxn
   const close = useCallback(() => setEditing(null), []);
   const catName = useMemo(() => new Map(categories.map((c) => [c.slug, c.name])), [categories]);
 
-  const rows = txns.filter(
-    (t) =>
-      (filter === "all" || (filter === "review" ? t.needsReview : filter === "in" ? t.amountCents > 0 : t.amountCents < 0)) &&
-      (!cat || t.category === cat) &&
-      (!q || t.description.toUpperCase().includes(q.toUpperCase())),
+  const rows = sortTxns(
+    txns.filter(
+      (t) =>
+        (filter === "all" || (filter === "review" ? t.needsReview : filter === "in" ? t.amountCents > 0 : t.amountCents < 0)) &&
+        (!cat || t.category === cat) &&
+        (!q || t.description.toUpperCase().includes(q.toUpperCase())),
+    ),
+    sort,
   );
   const reviewCount = txns.filter((t) => t.needsReview).length;
 
@@ -106,6 +114,25 @@ export default function BankView({ txns, categories, balances }: { txns: BankTxn
           {categories.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
         </select>
         <input type="search" placeholder="Search description" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search" />
+        <div className="bank-export">
+          <button type="button" className="btn-outline" aria-expanded={exportOpen} onClick={() => setExportOpen((o) => !o)}>Export CSV</button>
+          {exportOpen && (
+            <div className="bank-export-pop" role="dialog" aria-label="Export transactions">
+              <p className="muted small">Downloads what&apos;s showing ({FILTERS[filter].toLowerCase()}{cat ? `, ${catName.get(cat)}` : ""}{q ? `, “${q}”` : ""}). Leave the dates blank for everything.</p>
+              <div className="bank-export-dates">
+                <label>From<input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} /></label>
+                <label>To<input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} /></label>
+              </div>
+              <a
+                className="btn-primary"
+                href={`/bank/export?${new URLSearchParams({ filter, sort, ...(cat ? { category: cat } : {}), ...(q ? { q } : {}), ...(from ? { from } : {}), ...(to ? { to } : {}) })}`}
+                onClick={() => setExportOpen(false)}
+              >
+                Download CSV
+              </a>
+            </div>
+          )}
+        </div>
         {filter === "review" && rows.length > 0 && (
           <button type="button" className="btn-outline" disabled={busy} onClick={() => looksRight(rows.map((r) => r.id))}>
             All {rows.length} look right
@@ -122,10 +149,18 @@ export default function BankView({ txns, categories, balances }: { txns: BankTxn
           <table className="bank">
             <thead>
               <tr>
-                <th>Posted</th>
+                <th aria-sort={sort === "date-desc" ? "descending" : sort === "date-asc" ? "ascending" : "none"}>
+                  <button type="button" className="th-sort" onClick={() => setSort(sort === "date-desc" ? "date-asc" : "date-desc")} title="Sort by date">
+                    Posted <span aria-hidden="true">{sort === "date-desc" ? "▼" : sort === "date-asc" ? "▲" : ""}</span>
+                  </button>
+                </th>
                 <th>Description</th>
                 <th>Category</th>
-                <th className="num">Amount</th>
+                <th className="num" aria-sort={sort === "size-desc" ? "descending" : sort === "size-asc" ? "ascending" : "none"}>
+                  <button type="button" className="th-sort" onClick={() => setSort(sort === "size-desc" ? "size-asc" : sort === "size-asc" ? "date-desc" : "size-desc")} title="Sort by size: largest first, smallest first, then back to by date">
+                    Amount <span aria-hidden="true">{sort === "size-desc" ? "▼" : sort === "size-asc" ? "▲" : ""}</span>
+                  </button>
+                </th>
                 <th />
               </tr>
             </thead>
