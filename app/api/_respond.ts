@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
+import { currentSession } from "@/lib/auth";
 import { EditError } from "@/lib/ledger/edit";
 
 /** Run a write and turn its outcome into JSON. */
 export async function respond<T>(fn: () => Promise<T>): Promise<NextResponse> {
   try {
+    // The middleware checked the cookie; this checks the login is still active (not deactivated or reset).
+    if (!(await currentSession())) return NextResponse.json({ error: "You've been signed out. Reload the page and sign in again." }, { status: 401 });
     return NextResponse.json((await fn()) ?? { ok: true });
   } catch (e) {
     if (e instanceof EditError) return NextResponse.json({ error: e.message, deal: e.current }, { status: e.status });

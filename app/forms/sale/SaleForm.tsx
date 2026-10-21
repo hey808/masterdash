@@ -7,7 +7,7 @@ import { fmt } from "@/lib/money";
 
 type Method = "check" | "zelle" | "card" | "ach" | "cash" | "other";
 
-export default function SaleForm({ options, stock, today }: { options: LedgerOptions; stock: Record<string, Record<string, number>>; today: string }) {
+export default function SaleForm({ options, stock, today, me }: { options: LedgerOptions; stock: Record<string, Record<string, number>>; today: string; me?: { personId: string; name: string } | null }) {
   const openLocations = options.locations.filter((l) => l.active);
   const closers = options.people.filter((p) => p.roles.includes("closer") || p.roles.includes("manager"));
   const setters = options.people.filter((p) => p.roles.includes("setter"));
@@ -82,7 +82,7 @@ export default function SaleForm({ options, stock, today }: { options: LedgerOpt
         <p>{done.customer} is in the ledger and the products are set aside from {openLocations.find((l) => l.slug === location)?.name} stock.</p>
         <div className="row-actions">
           <a className="btn-primary big" href="/forms/sale">Enter another sale</a>
-          <a className="linkbtn" href="/ledger">Open the ledger</a>
+          {me ? <a className="linkbtn" href="/me">My commissions</a> : <a className="linkbtn" href="/ledger">Open the ledger</a>}
         </div>
       </div>
     );
@@ -93,12 +93,19 @@ export default function SaleForm({ options, stock, today }: { options: LedgerOpt
       <fieldset>
         <legend>The sale</legend>
         <div className="grid">
-          <label>Closer
-            <select name="closerId" required defaultValue="">
-              <option value="" disabled>Choose…</option>
-              {closers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </label>
+          {me ? (
+            <label>Closer
+              <input type="hidden" name="closerId" value={me.personId} />
+              <input value={me.name} readOnly aria-readonly="true" className="readonly" />
+            </label>
+          ) : (
+            <label>Closer
+              <select name="closerId" required defaultValue="">
+                <option value="" disabled>Choose…</option>
+                {closers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </label>
+          )}
           <label>Setter
             <select name="setterId" defaultValue={defaultSetter}>
               <option value="">(none)</option>

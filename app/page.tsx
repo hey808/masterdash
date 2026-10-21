@@ -3,6 +3,9 @@ import { fmt } from "@/lib/money";
 import { homeMetrics, type PersonStat } from "@/lib/reports";
 import { frameRange, isFrame, type Frame } from "@/lib/timeframe";
 import HomeFrame from "./HomeFrame";
+import Week from "./calendar/Week";
+import { loadCalendar } from "@/lib/ghl";
+import { mondayOf, weekDays, weekWindow } from "@/lib/week";
 
 export const dynamic = "force-dynamic";
 
@@ -12,13 +15,34 @@ export default async function Home({ searchParams }: { searchParams: { frame?: s
   const frame: Frame = isFrame(searchParams.frame) ? searchParams.frame : DEFAULT;
   const today = todayET();
   const [rf, rt] = frameRange(frame, today, searchParams.from, searchParams.to);
-  const m = await homeMetrics(today, rf ?? "2000-01-01", rt ?? today);
+  const monday = mondayOf(today);
+  const days = weekDays(monday);
+  const [m, cal] = await Promise.all([homeMetrics(today, rf ?? "2000-01-01", rt ?? today), loadCalendar(...weekWindow(monday))]);
+  const weekEvents = cal.events.filter((e) => days.includes(e.day));
+  const upcoming = weekEvents.filter((e) => e.day >= today && e.status !== "cancelled");
   const bankBehind = m.bankThrough != null && m.bankThrough < today;
 
   return (
     <>
       <h1>Home</h1>
-      <div className="table-bar">
+
+      <section className="home-cal">
+        <div className="home-cal-head">
+          <h2 className="section">This week</h2>
+          <span className="muted">
+            {upcoming.filter((e) => e.kind === "sales").length} sales appointments and {upcoming.filter((e) => e.kind === "install").length} installs still ahead
+          </span>
+          <a className="btn-outline page-btn" href="/calendar">Open calendar</a>
+        </div>
+        {cal.problems.length > 0 && (
+          <ul className="report-flags">
+            {cal.problems.map((p, i) => <li key={i}>{p.location}: {p.message}</li>)}
+          </ul>
+        )}
+        <Week days={days} events={weekEvents} today={today} compact />
+      </section>
+
+      <div className="table-bar home-numbers">
         <HomeFrame frame={frame} from={searchParams.from ?? ""} to={searchParams.to ?? ""} />
       </div>
 

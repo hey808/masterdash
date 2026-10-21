@@ -14,7 +14,7 @@ export interface OpenJob {
   products: string;
 }
 
-export default function InstallForm({ jobs, people, today }: { jobs: OpenJob[]; people: Array<{ id: string; name: string; roles: string[] }>; today: string }) {
+export default function InstallForm({ jobs, people, today, me }: { jobs: OpenJob[]; people: Array<{ id: string; name: string; roles: string[] }>; today: string; me?: { personId: string; name: string } | null }) {
   const installers = [...people].sort((a, b) => Number(b.roles.includes("installer")) - Number(a.roles.includes("installer")) || a.name.localeCompare(b.name));
   const [query, setQuery] = useState("");
   const [picked, setPicked] = useState<OpenJob | null>(null);
@@ -67,7 +67,7 @@ export default function InstallForm({ jobs, people, today }: { jobs: OpenJob[]; 
         <p>{done.products ? `${done.products} came out of the ${done.location} warehouse count.` : "No products were on this deal."}</p>
         <div className="row-actions">
           <a className="btn-primary big" href="/forms/install">Log another install</a>
-          <a className="linkbtn" href="/ledger">Open the ledger</a>
+          {me ? <a className="linkbtn" href="/me">My commissions</a> : <a className="linkbtn" href="/ledger">Open the ledger</a>}
         </div>
       </div>
     );
@@ -119,12 +119,19 @@ export default function InstallForm({ jobs, people, today }: { jobs: OpenJob[]; 
           <fieldset>
             <legend>Install</legend>
             <div className="grid">
-              <label>Installer
-                <select name="installerId" required defaultValue="">
-                  <option value="" disabled>Choose…</option>
-                  {installers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </label>
+              {me ? (
+                <label>Installer
+                  <input type="hidden" name="installerId" value={me.personId} />
+                  <input value={me.name} readOnly aria-readonly="true" className="readonly" />
+                </label>
+              ) : (
+                <label>Installer
+                  <select name="installerId" required defaultValue="">
+                    <option value="" disabled>Choose…</option>
+                    {installers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </label>
+              )}
               <label>Install date<input name="installedOn" type="date" required defaultValue={today} max={today} /></label>
             </div>
             <label className="check">

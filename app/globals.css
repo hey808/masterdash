@@ -690,3 +690,84 @@ table.statement td.neg-paren { color: #b0102a; }
   .payout-bar-total { font-size: 17px; }
   .payout-bar .btn-primary.big { padding: 10px 16px; font-size: 14px; }
 }
+
+/* Signed-in user menu */
+.navuser { margin-left: auto; }
+.topbar nav.mainnav { flex: 1; }
+.avatar { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--blue); color: #fff; font: 700 12px var(--font-body); }
+.navuser-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+.navmenu.right { left: auto; right: 0; }
+.topbar .navmenu .menu-btn { display: block; width: 100%; padding: 9px 12px; border: 0; border-radius: 8px; background: none; text-align: left; color: var(--ink); font: 500 14px var(--font-body); cursor: pointer; }
+.topbar .navmenu .menu-btn:hover { background: #fff3f4; color: var(--red); }
+.navmenu form { margin: 0; }
+@media (max-width: 760px) { .navuser-name { display: none; } .navmenu.right { left: 12px; right: 12px; } }
+
+/* Sign-in email field */
+.login input[type="email"] { padding: 10px 12px; border: 1px solid var(--line-2); border-radius: var(--radius-sm); font: 15px var(--font-body); color: var(--ink); background: #fff; }
+.login input[type="email"]:focus { outline: none; border-color: var(--blue); box-shadow: var(--ring); }
+.login p.muted { margin: 0 0 14px; }
+
+/* Locked form fields (the signed-in rep / installer) */
+.field-form input.readonly { background: #f4f8fe; color: var(--navy); font-weight: 600; cursor: default; }
+
+/* Team */
+.role-pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--mist); color: var(--navy); }
+.role-pill.r-admin { background: var(--navy); color: #fff; }
+.role-pill.r-sales { background: #e5f1ff; color: var(--blue-2); }
+.role-pill.r-installer { background: #e2f6ea; color: #17673a; }
+.credential { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0 0 14px; padding: 14px 16px; border: 1px solid #bfe5cf; background: #f3fbf6; border-radius: var(--radius-sm); }
+.credential code { margin: 0 4px; padding: 2px 6px; border-radius: 6px; background: #fff; border: 1px solid #cfe9d9; font-size: 13px; }
+.pw-row { display: flex; gap: 8px; align-items: center; }
+.pw-row input { flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important; }
+.check-row { display: flex !important; align-items: center; gap: 8px; font-size: 14px !important; font-weight: 500 !important; color: var(--ink) !important; }
+.check-row input { width: auto !important; }
+.pick-person { padding: 7px 12px; border: 1px solid var(--line-2); border-radius: 999px; font: 13.5px var(--font-body); }
+
+/* Calendar */
+.cal-weeknav { align-items: center; }
+.cal-range { font: 700 15px var(--font-display); color: var(--navy); padding: 0 6px; white-space: nowrap; }
+.cal-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; align-items: start; }
+.cal-day { min-height: 140px; padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+.cal-day.past { background: #fbfcfe; }
+.cal-day.past .cal-ev { opacity: 0.72; }
+.cal-day.today { border-color: var(--blue); box-shadow: inset 0 3px 0 var(--blue), var(--shadow); }
+.cal-day header { display: flex; align-items: baseline; gap: 6px; margin: 0 2px 8px; }
+.cal-day .dn { font: 700 12px var(--font-body); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.cal-day.today .dn { color: var(--blue); }
+.cal-day .dd { font: 800 15px var(--font-display); color: var(--navy); }
+.cal-day .dc { margin-left: auto; min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--mist); color: var(--navy); font: 700 11px/20px var(--font-body); text-align: center; }
+.cal-none { margin: 6px 2px; color: #9aa8bf; font-size: 12.5px; }
+.cal-day ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.cal-ev details { border-radius: 10px; border: 1px solid var(--line); border-left: 4px solid var(--blue); background: #f7fbff; }
+.cal-ev.k-install details { border-left-color: #12804e; background: #f4fbf7; }
+.cal-ev.s-cancelled details { border-left-color: #b9c3d3; background: #fafbfd; }
+.cal-ev.s-cancelled .title { text-decoration: line-through; color: var(--muted); }
+.cal-ev.s-noshow details { border-left-color: var(--red); }
+.cal-ev summary { display: grid; gap: 2px; padding: 7px 9px; cursor: pointer; list-style: none; }
+.cal-ev summary::-webkit-details-marker { display: none; }
+.cal-ev summary:hover { background: rgba(8, 125, 252, 0.05); border-radius: 9px; }
+.cal-ev .t { font: 700 12px var(--font-body); color: var(--navy); font-variant-numeric: tabular-nums; }
+.cal-ev .title { font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1.3; overflow-wrap: anywhere; }
+.cal-ev .meta { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 11.5px; color: var(--muted); }
+.cal-ev .kind { font-weight: 700; color: var(--blue-2); }
+.cal-ev .kind.k-install { color: #12804e; }
+.cal-ev .st { font-weight: 700; color: var(--warn); }
+.cal-ev.s-noshow .st, .cal-ev.s-cancelled .st { color: var(--red); }
+.cal-ev.s-showed .st { color: var(--ok); }
+.cal-more { padding: 0 9px 9px; font-size: 12.5px; color: #34435e; }
+.cal-more p { margin: 4px 0 0; overflow-wrap: anywhere; }
+.cal-more .notes { white-space: pre-wrap; color: var(--muted); }
+.cal-week.compact .cal-day { min-height: 110px; }
+.home-cal { margin-bottom: 26px; }
+.home-cal-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px; margin-bottom: 10px; }
+.home-cal-head h2.section { margin: 0; font-size: 19px; }
+.home-cal-head .page-btn { margin-left: auto; }
+.home-numbers { margin-top: 4px; }
+@media (max-width: 1100px) { .cal-week { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 760px) {
+  .cal-week { grid-template-columns: 1fr; gap: 8px; }
+  .cal-day { min-height: 0; }
+  .cal-day.past:not(.today) { display: none; }
+  .cal-weeknav { margin-left: 0; }
+}
+.cal-more-link { display: block; margin: 8px 2px 0; font-size: 12.5px; font-weight: 600; }

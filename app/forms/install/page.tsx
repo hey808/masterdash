@@ -1,5 +1,6 @@
 import { todayET } from "@/lib/dates";
 import { db } from "@/lib/db";
+import { currentSession } from "@/lib/auth";
 import { loadOptions } from "@/lib/ledger/options";
 import InstallForm, { type OpenJob } from "./InstallForm";
 
@@ -22,12 +23,15 @@ async function openJobs(): Promise<OpenJob[]> {
 }
 
 export default async function InstallFormPage() {
+  const session = await currentSession();
+  // Reps and installers submit as themselves; the API enforces it too.
+  const me = session && session.role !== "admin" && session.personId ? { personId: session.personId, name: session.name } : null;
   const [options, jobs] = await Promise.all([loadOptions(), openJobs()]);
   return (
     <>
       <p className="crumb"><a href="/forms">Forms</a> / Installer form</p>
       <h1>Installer form</h1>
-      <InstallForm jobs={jobs} people={options.people} today={todayET()} />
+      <InstallForm jobs={jobs} people={options.people} today={todayET()} me={me} />
     </>
   );
 }

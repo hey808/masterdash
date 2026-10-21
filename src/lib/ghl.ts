@@ -1,0 +1,146 @@
+/**
+ * GoHighLevel calendars, read-only. Sales appointments and installs for each
+ * location, pulled live from the GHL API (cached for a minute).
+ *
+ * Location and calendar IDs are config, not secrets, so they live here. The
+ * API keys (private integration tokens) come only from environment variables:
+ *   GHL_WILMINGTON_TOKEN, GHL_MYRTLE_TOKEN
+ * Calendars marked "do not use", deprecated, test, or setter-only are left out.
+ */
+const API = "https://services.leadconnectorhq.com";
+
+export type CalKind = "sales" | "install";
+
+export interface GhlLocation {
+  slug: "wilmington" | "myrtle-beach";
+  name: string;
+  locationId: string;
+  tokenEnv: string;
+  calendars: Array<{ id: string; kind: CalKind; name: string }>;
+}
+
+export const GHL_LOCATIONS: GhlLocation[] = [
+  {
+    slug: "wilmington",
+    name: "Wilmington",
+    locationId: "RjJ7wzp3qcMC7aamhR5F",
+    tokenEnv: "GHL_WILMINGTON_TOKEN",
+    calendars: [
+      { id: "ESLDeDswok2MtJfQaxyN", kind: "sales", name: "Water Consultation" },
+      { id: "jzVHuySUuQO6G0cXlqkx", kind: "install", name: "Installer Angel" },
+      { id: "MCJoKo2NQpRBVms2WaO4", kind: "install", name: "Installer Garrett" },
+    ],
+  },
+  {
+    slug: "myrtle-beach",
+    name: "Myrtle Beach",
+    locationId: "ospMdcsOX1WSD458jVJP",
+    tokenEnv: "GHL_MYRTLE_TOKEN",
+    calendars: [
+      { id: "jSVTUzKH8SqhopGkzLEq", kind: "sales", name: "Water Filtration" },
+      { id: "IeNXvmcLJxYqo2lbHxue", kind: "install", name: "Installer Calendar" },
+    ],
+  },
+];
+
+export interface CalEvent {
+  id: string;
+  location: GhlLocation["slug"];
+  locationName: string;
+  kind: CalKind;
+  calendarName: string;
+  title: string;
+  start: string; // ISO with offset
+  end: string;
+  /** yyyy-mm-dd in Eastern time, for grouping by day. */
+  day: string;
+  status: string; // confirmed, showed, noshow, cancelled, new, invalid
+  assignedTo: string | null;
+  address: string | null;
+  notes: string | null;
+  contactUrl: string | null;
+}
+
+export interface CalendarResult {
+  events: CalEvent[];
+  /** Locations whose key is missing or whose API call failed, with why. */
+  problems: Array<{ location: string; message: string }>;
+}
+
+const headers = (token: string, version: string) => ({ Authorization: `Bearer ${token}`, Version: version, Accept: "application/json" });
+
+const etDay = (iso: string) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
+
+async function users(loc: GhlLocation, token: string): Promise<Map<string, string>> {
+  try {
+    const res = await fetch(`${API}/users/?locationId=${loc.locationId}`, { headers: headers(token, "2021-07-28"), next: { revalidate: 3600 } });
+    if (!res.ok) return new Map();
+    const j = (await res.json()) as { users?: Array<{ id: string; name?: string; firstName?: string; lastName?: string }> };
+    return new Map((j.users ?? []).map((u) => [u.id, (u.name || `${u.firstName ?? ""} ${u.lastName ?? ""}`).trim()]));
+  } catch {
+    return new Map();
+  }
+}
+
+/** GHL titles often carry a status prefix ("CONFIRMED: …", "confirmed. …"); the status is shown separately. */
+function cleanTitle(t: string): string {
+  return t.replace(/^\s*(confirmed|showed|no ?show|cancell?ed|new)\s*[:.\-–]\s*/i, "").trim() || t;
+}
+
+export async function loadCalendar(fromIso: string, toIso: string): Promise<CalendarResult> {
+  const start = Date.parse(fromIso);
+  const end = Date.parse(toIso);
+  const problems: CalendarResult["problems"] = [];
+  const perLocation = await Promise.all(
+    GHL_LOCATIONS.map(async (loc) => {
+      const token = process.env[loc.tokenEnv];
+      if (!token) {
+        problems.push({ location: loc.name, message: `${loc.tokenEnv} isn't set in Vercel` });
+        return [];
+      }
+      const names = await users(loc, token);
+      const lists = await Promise.all(
+        loc.calendars.map(async (cal) => {
+          const url = `${API}/calendars/events?locationId=${loc.locationId}&calendarId=${cal.id}&startTime=${start}&endTime=${end}`;
+          try {
+            const res = await fetch(url, { headers: headers(token, "2021-04-15"), next: { revalidate: 60 } });
+            if (!res.ok) {
+              problems.push({ location: loc.name, message: `${cal.name}: GoHighLevel said ${res.status}${res.status === 401 ? " (check the API key)" : ""}` });
+              return [];
+            }
+            const j = (await res.json()) as { events?: Array<Record<string, unknown>> };
+            return (j.events ?? [])
+              .filter((e) => !e.deleted)
+              .map((e): CalEvent => {
+                const startIso = String(e.startTime);
+                const assigned = (e.assignedUserId as string | undefined) ?? (e.users as string[] | undefined)?.[0];
+                return {
+                  id: String(e.id),
+                  location: loc.slug,
+                  locationName: loc.name,
+                  kind: cal.kind,
+                  calendarName: cal.name,
+                  title: cleanTitle(String(e.title ?? "Appointment")),
+                  start: startIso,
+                  end: String(e.endTime ?? startIso),
+                  day: etDay(startIso),
+                  status: String(e.appointmentStatus ?? e.appoinmentStatus ?? "confirmed").toLowerCase(),
+                  assignedTo: assigned ? names.get(assigned) ?? null : null,
+                  address: (e.address as string | undefined)?.trim() || null,
+                  notes: ((e.notes ?? e.description) as string | undefined)?.trim() || null,
+                  contactUrl: e.contactId ? `https://app.gohighlevel.com/v2/location/${loc.locationId}/contacts/detail/${e.contactId}` : null,
+                };
+              });
+          } catch {
+            problems.push({ location: loc.name, message: `${cal.name}: couldn't reach GoHighLevel` });
+            return [];
+          }
+        }),
+      );
+      return lists.flat();
+    }),
+  );
+  const events = perLocation.flat().sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
+  return { events, problems };
+}
