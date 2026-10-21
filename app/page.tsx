@@ -28,7 +28,7 @@ export default async function Home({ searchParams }: { searchParams: { days?: st
 
       <div className="home-stats">
         <Big label="Revenue" value={fmt(m.revenueCents)} href="/ledger" />
-        <Big label="Collected" value={fmt(m.collectedCents)} href="/bank" flag={bankBehind ? `Bank through ${shortDate(m.bankThrough)}` : m.bankThrough == null ? "Import bank statements" : undefined} />
+        <Big label="Collected" value={fmt(m.collectedCents)} href="/ledger" flag={m.collectedUndated ? `${m.collectedUndated} imported payment${m.collectedUndated === 1 ? "" : "s"} dated by install day` : undefined} />
         <Big label="Accounts receivable" value={fmt(m.receivableCents)} href="/ledger" tone={m.receivableCents > 0 ? "due" : undefined} />
         <Big label="Expenses" value={fmt(m.expensesCents)} href="/reports" flag={bankBehind ? `Bank through ${shortDate(m.bankThrough)}` : m.bankThrough == null ? "Import bank statements" : undefined} />
       </div>

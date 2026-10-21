@@ -270,6 +270,8 @@ export interface HomeMetrics {
   soldCents: number;
   sold: number;
   collectedCents: number;
+  /** Payments in the total that had no date and were placed on the install/sale day. */
+  collectedUndated: number;
   receivableCents: number;
   receivableDeals: number;
   expensesCents: number;
@@ -302,6 +304,14 @@ export async function homeMetrics(today: string, days: number): Promise<HomeMetr
       .sort((a, b) => b.revenueCents - a.revenueCents || b.deals - a.deals);
   };
 
+  // Money in from customers and lenders as recorded on the deals. Payments imported from Mission Control
+  // carry no date; they count on the install day (or the sale day if not installed yet).
+  const collected = l.flatMap((d) =>
+    d.payments
+      .map((p) => ({ amountCents: p.amountCents, on: p.receivedOn ?? d.installedOn ?? d.saleDate, undated: p.receivedOn == null }))
+      .filter((p) => inWin(p.on)),
+  );
+
   // Business spending: everything out of the bank except loans, owner draws and moves between our accounts.
   const spendKinds = new Set(["ledger", "cogs", "opex", "uncategorized"]);
   return {
@@ -311,7 +321,8 @@ export async function homeMetrics(today: string, days: number): Promise<HomeMetr
     installs: installed.length,
     soldCents: sumCents(sold.map((d) => d.priceCents)),
     sold: sold.length,
-    collectedCents: sumCents(txns.filter((t) => t.kind === "income").map((t) => t.amountCents)),
+    collectedCents: sumCents(collected.map((x) => x.amountCents)),
+    collectedUndated: collected.filter((x) => x.undated).length,
     receivableCents: sumCents(ar.map((d) => Math.max(0, d.cashDueCents) + Math.max(0, d.fundingDueCents))),
     receivableDeals: ar.length,
     expensesCents: -sumCents(txns.filter((t) => spendKinds.has(t.kind) && t.amountCents < 0).map((t) => t.amountCents)),
