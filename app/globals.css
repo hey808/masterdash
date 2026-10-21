@@ -317,3 +317,6 @@ tbody tr[id^="deal-"] { scroll-margin-top: 120px; }
 .filters.loc-pills { margin: 0; padding-left: 16px; border-left: 1px solid var(--line); }
 .filters.loc-pills a { padding: 4px 11px; font-size: 12.5px; }
 .filters.loc-pills a.on { background: var(--mist); border-color: var(--blue); color: var(--navy); font-weight: 600; }
+
+/* Money still owed */
+td.owed, td.calc.owed { background: #fdecee; color: var(--red); font-weight: 600; }
