@@ -210,6 +210,11 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
     }
   }
 
+  // Consolidated hides its collapsed columns outright; All Deals keeps them as thin strips you can reopen.
+  const hideCollapsed = view === "consolidated";
+  const shown = hideCollapsed ? COLUMNS.filter((c) => !collapsed.has(c.key)) : COLUMNS;
+  const hiddenCount = hideCollapsed ? COLUMNS.length - shown.length : 0;
+
   const pin = (key: string) =>
     key === "number"
       ? { cls: "pin pin-num", style: { left: 0, width: NUM_W, minWidth: NUM_W, maxWidth: NUM_W } }
@@ -234,6 +239,7 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
             Reset {VIEWS[view].label} columns
           </button>
         )}
+        {hiddenCount > 0 && <span>{hiddenCount} columns hidden in this view. Switch to All Deals to see them.</span>}
         <span className="legend">White cells: click to edit. Shaded cells are calculated. Click a Collected amount to record a payment.</span>
       </div>
       {flash && (
@@ -245,7 +251,7 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
         <table>
           <thead>
             <tr>
-              {COLUMNS.map((c) => {
+              {shown.map((c) => {
                 const isC = collapsed.has(c.key);
                 const p = pin(c.key);
                 return (
@@ -268,7 +274,7 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
           <tbody>
             {rows.map((r) => (
               <tr key={r.id}>
-                {COLUMNS.map((c) => {
+                {shown.map((c) => {
                   const isC = collapsed.has(c.key);
                   const p = pin(c.key);
                   const base = `${c.num ? "num" : ""} ${p.cls}`;
@@ -309,7 +315,7 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
           {rows.length > 0 && (
             <tfoot>
               <tr>
-                {COLUMNS.map((c) => {
+                {shown.map((c) => {
                   const isC = collapsed.has(c.key);
                   const p = pin(c.key);
                   const content = isC ? null : c.key === "number" ? rows.length : c.key === "stage" ? null : c.key === "customer" ? "deals" : c.field && !c.num ? null : c.total?.(rows);
