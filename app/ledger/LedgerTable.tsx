@@ -116,13 +116,10 @@ const VIEWS: Record<"consolidated" | "receivables" | "all", ViewDef> = {
     label: "Receivables",
     collapsed: only(RECEIVABLES),
     hide: true,
-    // Only deals with money still owed. Installed jobs first (that's real AR), oldest balance first, then biggest.
-    filter: (r) => r.stage !== "cancelled" && outstanding(r) > 50,
-    sort: (a, b) =>
-      Number(b.isInstalled) - Number(a.isInstalled) ||
-      (daysSince(b.installedOn) ?? -1) - (daysSince(a.installedOn) ?? -1) ||
-      outstanding(b) - outstanding(a),
-    note: "Deals with money still owed. Installed jobs first, oldest balance on top; then jobs not installed yet.",
+    // A receivable is money owed on work already done: installed, not cancelled, balance left. Oldest first, then biggest.
+    filter: (r) => r.stage !== "cancelled" && r.isInstalled && outstanding(r) > 50,
+    sort: (a, b) => (daysSince(b.installedOn) ?? -1) - (daysSince(a.installedOn) ?? -1) || outstanding(b) - outstanding(a),
+    note: "Installed jobs with money still owed, oldest first. Sold jobs not installed yet aren't receivables until the install.",
   },
   all: { label: "All Deals", collapsed: [], hide: false },
 };
