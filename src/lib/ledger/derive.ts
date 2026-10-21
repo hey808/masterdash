@@ -13,6 +13,9 @@
  *   - rates are read from the deal (stamped at sale), never from today's plan
  *   - collected is the sum of payment rows; paid is the sum of payout rows
  *   - revenue is recognized in the install month
+ *   - the price splits three ways: cash + card + financed (2026-10-21)
+ *   - the lender fee is the dollars the lender kept, recorded on the funding
+ *     (fee on the lender payment rows), not a rate; 0 until funding is recorded
  */
 import { applyRate, sumCents, type Cents } from "../money";
 import type { Deal, DerivedDeal, PayoutKind, PayoutPosition, Person, Stage } from "./types";
@@ -23,7 +26,8 @@ export const SETTLED_CENTS = 50;
 const month = (d: string) => d.slice(0, 7);
 
 export function derive(d: Deal, asOf: string): DerivedDeal {
-  const loanInterestCents = d.loanInterestOverrideCents ?? applyRate(d.financedPortionCents, d.lenderRate);
+  const loanInterestCents =
+    d.loanInterestOverrideCents ?? sumCents(d.payments.filter((p) => p.source === "lender").map((p) => p.feeCents));
   const cardFeeCents =
     d.cardFeeOverrideCents ?? sumCents(d.payments.filter((p) => p.source === "customer").map((p) => p.feeCents));
   const feesCents = loanInterestCents + cardFeeCents;
@@ -32,12 +36,12 @@ export function derive(d: Deal, asOf: string): DerivedDeal {
   const cashCollectedCents = sumCents(d.payments.filter((p) => p.source === "customer").map((p) => p.amountCents));
   const fundedCents = sumCents(d.payments.filter((p) => p.source === "lender").map((p) => p.amountCents));
   const collectedCents = cashCollectedCents + fundedCents;
-  const cashDueCents = d.cashPortionCents - cashCollectedCents;
+  const cashDueCents = d.cashPortionCents + d.cardPortionCents - cashCollectedCents;
   const fundingExpectedCents =
     d.fundingExpectedOverrideCents ?? Math.max(0, d.financedPortionCents - loanInterestCents);
   const fundingDueCents = fundingExpectedCents - fundedCents;
   const balanceCents = d.priceCents - collectedCents;
-  const splitDiffCents = d.priceCents - (d.cashPortionCents + d.financedPortionCents);
+  const splitDiffCents = d.priceCents - (d.cashPortionCents + d.cardPortionCents + d.financedPortionCents);
 
   const commissionBaseCents = netRevenueCents - d.extrasCents - d.adminFeeCents;
   const commissionCents = d.closer ? applyRate(commissionBaseCents, d.commissionRate) : 0;
@@ -64,11 +68,15 @@ export function derive(d: Deal, asOf: string): DerivedDeal {
     ? "cancelled"
     : d.closedAt
       ? "closed"
-      : isInstalled && moneyIn
-        ? "collected"
-        : isInstalled
-          ? "installed"
-          : "sold";
+      : !isInstalled
+        ? d.installScheduledOn && d.installScheduledOn < asOf
+          ? "needs-attention"
+          : "awaiting-install"
+        : cashDueCents > SETTLED_CENTS
+          ? "awaiting-payment"
+          : fundingDueCents > SETTLED_CENTS
+            ? "awaiting-funding"
+            : "collected";
 
   const waitingForMoney =
     cashDueCents > SETTLED_CENTS
@@ -99,8 +107,7 @@ export function derive(d: Deal, asOf: string): DerivedDeal {
     if (!isInstalled && !d.installScheduledOn) issues.push("No install date");
     if (fundingDueCents < -SETTLED_CENTS) issues.push("Lender over-funded");
     if (cashDueCents < -SETTLED_CENTS) issues.push("Customer over-paid");
-    if (splitDiffCents !== 0) issues.push("Cash + financed does not equal price");
-    if (d.financedPortionCents > 0 && d.lenderRate === 0 && d.loanInterestOverrideCents == null) issues.push("Financed at 0% lender fee");
+    if (splitDiffCents !== 0) issues.push("Cash + card + financed does not equal price");
     if (d.commissionRate >= 0.5) issues.push("Commission rate looks wrong");
     if (payoutPositions.some((p) => p.openCents < -SETTLED_CENTS)) issues.push("Paid more than earned");
     if (d.closedAt && (cashDueCents > SETTLED_CENTS || fundingDueCents > SETTLED_CENTS)) issues.push("Closed with money still owed");

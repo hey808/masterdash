@@ -112,6 +112,8 @@ export async function recordPayment(dealId: string, input: unknown, actor: strin
       "insert into payments (deal_id, source, method, amount_cents, fee_cents, received_on, note) values ($1,$2,$3,$4,$5,$6,$7)",
       [dealId, v.source, v.method, v.amountCents, v.feeCents, v.receivedOn, v.note ?? null],
     );
+    // A lender fee recorded with the funding replaces any fee typed by hand.
+    if (v.source === "lender" && v.feeCents > 0) await c.query("update deals set loan_interest_override_cents = null where id = $1", [dealId]);
     await c.query("update deals set updated_at = now() where id = $1", [dealId]); // bump version
     return derivedDeal(dealId, c);
   });

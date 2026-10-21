@@ -10,7 +10,7 @@ const angel = { id: "a", name: "Angel" };
 const base: Deal = {
   id: "d1", number: 1001, version: 1, location: "wilmington", customerName: "A", customerAddress: null, saleDate: "2026-10-01",
   leadSource: null, externalRef: null, closer: brock, manager: mike, setter: null, canvasser: null, installer: angel,
-  priceCents: 749500, cashPortionCents: 749500, financedPortionCents: 0, splitException: null, lender: null, lenderRate: 0,
+  priceCents: 749500, cashPortionCents: 749500, cardPortionCents: 0, financedPortionCents: 0, splitException: null, lender: null, lenderRate: 0,
   commissionRate: 0.15, commissionRateSource: "plan", managerRate: 0.03, setterRate: 0, canvasserRate: 0,
   adminFeeCents: 25000, extrasCents: 0, installerPayCents: 125000, loanInterestOverrideCents: null, cardFeeOverrideCents: null,
   fundingExpectedOverrideCents: null, cogsOverrideCents: null, overrideReason: null, installScheduledOn: "2026-10-05",

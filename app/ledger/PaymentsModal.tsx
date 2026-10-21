@@ -138,12 +138,10 @@ export default function PaymentsModal({ deal, initialSource, onClose, onDeal }: 
               </select>
             </label>
           )}
-          {source === "customer" && (
-            <label>
-              Card fee
-              <input name="fee" inputMode="decimal" placeholder="0.00" />
-            </label>
-          )}
+          <label>
+            {source === "lender" ? "Lender fee (what they kept)" : "Card fee"}
+            <input name="fee" inputMode="decimal" placeholder="0.00" />
+          </label>
         </div>
         {error && <p className="flash">{error}</p>}
         <div className="products-actions">

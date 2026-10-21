@@ -13,6 +13,10 @@ export default function FormsPage() {
           <span className="form-card-kicker">Installer</span>
           <span className="form-card-title">Installer form</span>
         </a>
+        <a className="form-card" href="/forms/funding">
+          <span className="form-card-kicker">Office</span>
+          <span className="form-card-title">Record funding</span>
+        </a>
         <a className="form-card" href="/forms/payout">
           <span className="form-card-kicker">Office</span>
           <span className="form-card-title">Payout form</span>

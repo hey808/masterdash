@@ -26,6 +26,7 @@ function deal(over: Partial<Deal> = {}): Deal {
     installer: angel,
     priceCents: 799500,
     cashPortionCents: 0,
+    cardPortionCents: 0,
     financedPortionCents: 799500,
     splitException: null,
     lender: "ISPC",
@@ -38,7 +39,8 @@ function deal(over: Partial<Deal> = {}): Deal {
     adminFeeCents: 25000,
     extrasCents: 0,
     installerPayCents: 125000,
-    loanInterestOverrideCents: null,
+    // The lender kept $799.50 (10% of the financed $7,995), as recorded at funding.
+    loanInterestOverrideCents: 79950,
     cardFeeOverrideCents: null,
     fundingExpectedOverrideCents: null,
     cogsOverrideCents: null,
@@ -72,9 +74,21 @@ describe("money", () => {
 });
 
 describe("derive: Mission Control regressions", () => {
-  it("charges the lender fee on the financed portion only", () => {
-    const d = derive(deal({ cashPortionCents: 450000, financedPortionCents: 350000, priceCents: 800000 }), AS_OF);
-    expect(d.loanInterestCents).toBe(35000); // 10% of $3,500, not of $8,000
+  it("the lender fee is the dollars recorded with the funding, 0 until then", () => {
+    const base = { cashPortionCents: 450000, financedPortionCents: 350000, priceCents: 800000, loanInterestOverrideCents: null };
+    const before = derive(deal(base), AS_OF);
+    expect(before.loanInterestCents).toBe(0);
+    expect(before.fundingDueCents).toBe(350000);
+    const after = derive(deal({ ...base, payments: [{ source: "lender", method: "lender", amountCents: 315000, feeCents: 35000, receivedOn: "2026-10-01" }] }), AS_OF);
+    expect(after.loanInterestCents).toBe(35000);
+    expect(after.fundingDueCents).toBe(0);
+    expect(after.netRevenueCents).toBe(800000 - 35000);
+  });
+
+  it("splits the price three ways and the customer owes cash + card", () => {
+    const d = derive(deal({ priceCents: 800000, cashPortionCents: 200000, cardPortionCents: 100000, financedPortionCents: 500000, loanInterestOverrideCents: null }), AS_OF);
+    expect(d.splitDiffCents).toBe(0);
+    expect(d.cashDueCents).toBe(300000);
   });
 
   it("net profit subtracts the fee in dollars, not the rate", () => {
@@ -161,9 +175,14 @@ describe("derive: what the new ledger adds", () => {
     expect(d.netProfitCents).toBeNull();
   });
 
-  it("walks the lifecycle: sold → installed → collected → closed", () => {
-    expect(derive(deal(), AS_OF).stage).toBe("sold");
-    expect(derive(deal({ installedOn: "2026-09-20" }), AS_OF).stage).toBe("installed");
+  it("walks the lifecycle: awaiting install → needs attention → awaiting funding/payment → collected → closed", () => {
+    expect(derive(deal({ installScheduledOn: "2026-10-25" }), AS_OF).stage).toBe("awaiting-install");
+    expect(derive(deal({ installScheduledOn: null }), AS_OF).stage).toBe("awaiting-install");
+    expect(derive(deal(), AS_OF).stage).toBe("needs-attention"); // scheduled 2026-09-20, nothing recorded
+    expect(derive(deal({ installedOn: "2026-09-20" }), AS_OF).stage).toBe("awaiting-funding");
+    expect(
+      derive(deal({ installedOn: "2026-09-20", cashPortionCents: 100000, financedPortionCents: 699500, payments: [{ source: "lender", method: "lender", amountCents: 619550, feeCents: 0, receivedOn: "2026-09-30" }] }), AS_OF).stage,
+    ).toBe("awaiting-payment");
     const paid = { source: "lender" as const, method: "lender", amountCents: 719550, feeCents: 0, receivedOn: "2026-09-30" };
     expect(derive(deal({ installedOn: "2026-09-20", payments: [paid] }), AS_OF).stage).toBe("collected");
     expect(derive(deal({ installedOn: "2026-09-20", payments: [paid], closedAt: "2026-10-01T00:00:00Z" }), AS_OF).stage).toBe("closed");

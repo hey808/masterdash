@@ -52,6 +52,7 @@ export function rowToDeal(r: Row): Deal {
     installer: (r.installer as Person | null) ?? null,
     priceCents: Number(r.price_cents),
     cashPortionCents: Number(r.cash_portion_cents),
+    cardPortionCents: Number(r.card_portion_cents ?? 0),
     financedPortionCents: Number(r.financed_portion_cents),
     splitException: s(r.split_exception),
     lender: s(r.lender_name),

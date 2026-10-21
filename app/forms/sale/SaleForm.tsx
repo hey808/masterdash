@@ -18,6 +18,7 @@ export default function SaleForm({ options, stock, today, me }: { options: Ledge
   const [qty, setQty] = useState<Record<string, number>>({});
   const [price, setPrice] = useState("");
   const [financed, setFinanced] = useState("");
+  const [card, setCard] = useState("");
   const [lender, setLender] = useState("");
   const [hasDeposit, setHasDeposit] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -26,7 +27,9 @@ export default function SaleForm({ options, stock, today, me }: { options: Ledge
 
   const priceCents = parseMoneyInput(price);
   const financedCents = parseMoneyInput(financed) ?? 0;
-  const cashCents = priceCents != null && !Number.isNaN(priceCents) && !Number.isNaN(financedCents) ? priceCents - financedCents : null;
+  const cardCents = parseMoneyInput(card) ?? 0;
+  const cashCents =
+    priceCents != null && !Number.isNaN(priceCents) && !Number.isNaN(financedCents) && !Number.isNaN(cardCents) ? priceCents - financedCents - cardCents : null;
   const avail = stock[location] ?? {};
   const short = useMemo(() => (location ? Object.entries(qty).filter(([sku, q]) => q > 0 && q > (avail[sku] ?? 0)) : []), [qty, avail, location]);
 
@@ -38,6 +41,7 @@ export default function SaleForm({ options, stock, today, me }: { options: Ledge
     if (!location) return setError("Pick the location.");
     if (priceCents == null || Number.isNaN(priceCents)) return setError("Enter the price.");
     if (Number.isNaN(financedCents)) return setError("Financed amount isn't a valid number.");
+    if (Number.isNaN(cardCents)) return setError("Card amount isn't a valid number.");
     const depositCents = hasDeposit ? parseMoneyInput(String(f.get("depositAmount") ?? "")) : null;
     if (hasDeposit && (depositCents == null || Number.isNaN(depositCents))) return setError("Enter the deposit amount.");
     setBusy(true);
@@ -58,6 +62,7 @@ export default function SaleForm({ options, stock, today, me }: { options: Ledge
           products,
           priceCents,
           financedPortionCents: financedCents,
+          cardPortionCents: cardCents,
           lender: financedCents > 0 ? lender || null : null,
           deposit: hasDeposit && depositCents ? { amountCents: depositCents, method: f.get("depositMethod") as Method } : null,
           installScheduledOn: f.get("installScheduledOn") || null,
@@ -185,6 +190,9 @@ export default function SaleForm({ options, stock, today, me }: { options: Ledge
           <label>Financed amount
             <input inputMode="decimal" value={financed} onChange={(e) => setFinanced(e.target.value)} placeholder="$0" />
           </label>
+          <label>Paid by card
+            <input inputMode="decimal" value={card} onChange={(e) => setCard(e.target.value)} placeholder="$0" />
+          </label>
           {financedCents > 0 && (
             <label>Lender
               <select value={lender} onChange={(e) => setLender(e.target.value)} required>
@@ -194,7 +202,7 @@ export default function SaleForm({ options, stock, today, me }: { options: Ledge
             </label>
           )}
           <div className="computed">
-            <span className="muted">Cash portion</span>
+            <span className="muted">Cash</span>
             <strong>{cashCents == null ? "—" : cashCents < 0 ? <span className="neg">more than the price</span> : fmt(cashCents, { decimals: 2 })}</strong>
           </div>
         </div>

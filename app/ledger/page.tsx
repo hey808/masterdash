@@ -1,3 +1,5 @@
+import { syncInstallDates } from "@/lib/install-sync";
+import RecordMenu from "./RecordMenu";
 import { todayET } from "@/lib/dates";
 import { loadOptions, type LedgerOptions } from "@/lib/ledger/options";
 import { loadLedger } from "@/lib/ledger/repo";
@@ -14,6 +16,8 @@ const LOCATIONS = [
 
 export default async function LedgerPage({ searchParams }: { searchParams: { loc?: string } }) {
   const asOf = todayET();
+  // Scheduled install dates follow the GoHighLevel installer calendars.
+  await syncInstallDates(asOf).catch((e) => console.error("install date sync failed", e));
   const loc = LOCATIONS.find(([k]) => k === searchParams.loc)?.[0] ?? "";
 
   let all: DerivedDeal[];
@@ -37,8 +41,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: { loc
       <div className="page-head">
         <h1>Deal Ledger</h1>
         <div className="page-actions">
-          <a className="btn-primary page-btn" href="/forms/sale">+ Sales form</a>
-          <a className="btn-outline page-btn" href="/forms/install">Installer form</a>
+          <RecordMenu />
         </div>
       </div>
       <LedgerTable rows={rows} options={options} locations={LOCATIONS.map(([slug, label]) => ({ slug, label, href: href(slug), on: slug === loc }))} />

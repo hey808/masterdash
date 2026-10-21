@@ -8,7 +8,7 @@ import PaymentsModal from "./PaymentsModal";
 import { shortDate, todayET } from "@/lib/dates";
 import { FIELDS, parseMoneyInput, parseRateInput, type FieldDef, type FieldKey } from "@/lib/ledger/fields";
 import type { LedgerOptions } from "@/lib/ledger/options";
-import type { DealLine, DerivedDeal } from "@/lib/ledger/types";
+import { STAGE_LABEL, type DealLine, type DerivedDeal } from "@/lib/ledger/types";
 import { fmt, fmtRate, sumCents } from "@/lib/money";
 
 /* ── Columns ─────────────────────────────────────────────────────────── */
@@ -45,7 +45,7 @@ const productsText = (lines: DealLine[]) => lines.map((l) => (l.qty > 1 ? `${l.q
 
 const COLUMNS: Col[] = [
   { key: "number", label: "#", fixed: true, cell: (r) => r.number, cellClass: () => "muted" },
-  { key: "stage", label: "Stage", fixed: true, cell: (r) => <span className={`stage ${r.stage}`}>{r.stage}</span> },
+  { key: "stage", label: "Stage", fixed: true, cell: (r) => <span className={`stage ${r.stage}`}>{STAGE_LABEL[r.stage]}</span> },
   { key: "customer", label: "Customer", fixed: true, field: "customerName", cell: (r) => r.customerName, cellClass: () => "customer" },
   { key: "address", label: "Address", field: "customerAddress", cell: (r) => r.customerAddress ?? "" },
   { key: "location", label: "Location", field: "location", cell: (r) => LOCATION_NAME[r.location] ?? r.location },
@@ -56,11 +56,12 @@ const COLUMNS: Col[] = [
   { key: "sold", label: "Sold Date", field: "saleDate", cell: (r) => shortDate(r.saleDate) },
   { key: "products", label: "Products", field: "products", cell: (r) => productsText(r.lines) || <span className="muted">none</span> },
   { key: "price", label: "Price", field: "priceCents", ...money((r) => r.priceCents) },
-  { key: "cash", label: "Cash Portion", field: "cashPortionCents", ...money((r) => r.cashPortionCents) },
+  { key: "cash", label: "Cash", field: "cashPortionCents", ...money((r) => r.cashPortionCents) },
+  { key: "card", label: "Card", field: "cardPortionCents", ...money((r) => r.cardPortionCents) },
   { key: "financed", label: "Financed", field: "financedPortionCents", ...money((r) => r.financedPortionCents) },
   { key: "lender", label: "Lender", field: "lender", cell: (r) => r.lender ?? "" },
-  { key: "lenderRate", label: "Lender Fee %", field: "lenderRate", num: true, cell: (r) => fmtRate(r.lenderRate) },
-  { key: "fees", label: "Fees", ...money((r) => r.feesCents) },
+  { key: "lenderFee", label: "Lender Fee", ...money((r) => r.loanInterestCents) },
+  { key: "cardFee", label: "Card Fee", ...money((r) => r.cardFeeCents) },
   { key: "net", label: "Net Revenue", ...money((r) => r.netRevenueCents) },
   { key: "collectedCustomer", label: "Customer Collected", ...money((r) => r.cashCollectedCents) },
   { key: "custOwes", label: "Customer Outstanding", ...money((r) => r.cashDueCents, (r) => Math.max(0, r.cashDueCents)), cellClass: (r) => (r.cashDueCents < 0 ? "neg" : r.cashDueCents > 50 ? "owed" : "") },
@@ -100,7 +101,7 @@ const COLUMNS: Col[] = [
 ];
 
 /** Column views. Each view starts from its preset; tweaks are remembered per view in this browser. */
-const CONSOLIDATED = ["location", "sold", "price", "cash", "financed", "fees", "collectedCustomer", "collectedLender", "outstanding", "scheduled", "installed", "profit"];
+const CONSOLIDATED = ["location", "sold", "price", "cash", "card", "financed", "lenderFee", "cardFee", "collectedCustomer", "collectedLender", "outstanding", "scheduled", "installed", "profit"];
 const RECEIVABLES = ["location", "closer", "sold", "lender", "installed", "daysOut", "price", "collectedCustomer", "custOwes", "collectedLender", "lenderOwes", "outstanding"];
 const only = (keep: string[]) => COLUMNS.filter((c) => !c.fixed && !keep.includes(c.key)).map((c) => c.key);
 
@@ -129,9 +130,9 @@ const VIEWS: Record<"consolidated" | "receivables" | "all", ViewDef> = {
 };
 type ViewKey = keyof typeof VIEWS;
 const DEFAULT_VIEW: ViewKey = "consolidated";
-const viewStorage = (v: ViewKey) => `ledger.view.${v}.collapsed.v3`; // v3: Missing + Days Since Install Date columns; v2: Total Outstanding + Collected - Lender in Consolidated
+const viewStorage = (v: ViewKey) => `ledger.view.${v}.collapsed.v4`; // v4: Card, Lender Fee ($), Card Fee columns; v3: Missing + Days Since Install Date columns; v2: Total Outstanding + Collected - Lender in Consolidated
 const NUM_W = 56;
-const STAGE_W = 104;
+const STAGE_W = 148;
 const COLLAPSED_W = 28;
 
 /** The stored value behind a typed field, as the editor starts from it. */
@@ -153,12 +154,12 @@ function rawValue(r: DerivedDeal, f: FieldKey): unknown {
     case "products": return r.lines.map((l) => ({ skuCode: l.skuCode, qty: l.qty }));
     case "priceCents": return r.priceCents;
     case "cashPortionCents": return r.cashPortionCents;
+    case "cardPortionCents": return r.cardPortionCents;
     case "financedPortionCents": return r.financedPortionCents;
     case "adminFeeCents": return r.adminFeeCents;
     case "extrasCents": return r.extrasCents;
     case "installerPayCents": return r.installerPayCents;
     case "lender": return r.lender;
-    case "lenderRate": return r.lenderRate;
     case "commissionRate": return r.commissionRate;
     case "managerRate": return r.managerRate;
     case "closed": return r.closedAt != null;
@@ -442,8 +443,8 @@ export default function LedgerTable({ rows: initial, options, locations }: {
                       </td>
                     );
                   }
-                  if (c.key === "collectedCustomer" || c.key === "collectedLender") {
-                    const source = c.key === "collectedLender" ? "lender" : "customer";
+                  if (c.key === "collectedCustomer" || c.key === "collectedLender" || c.key === "lenderFee" || c.key === "cardFee") {
+                    const source = c.key === "collectedLender" || c.key === "lenderFee" ? "lender" : "customer";
                     return (
                       <td key={c.key} className={`${base} calc action`} style={p.style}>
                         <button type="button" className="cellbtn" onClick={() => setPaymentsFor({ id: r.id, source })} title="See and record payments">
@@ -751,7 +752,7 @@ function StageModal({ deal, onClose, save }: { deal: DerivedDeal; onClose: () =>
     <Modal title={`#${deal.number} ${deal.customerName}`} onClose={onClose} width={520}>
       <form className="pay-form" onSubmit={submit}>
         <p className="muted">
-          Stage: <span className={`stage ${deal.stage}`}>{deal.stage}</span>
+          Stage: <span className={`stage ${deal.stage}`}>{STAGE_LABEL[deal.stage]}</span>
         </p>
         {cancelled ? (
           <>

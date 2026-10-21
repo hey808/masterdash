@@ -19,7 +19,7 @@ export class EditError extends Error {
 
 /** Database constraint → plain-language message. */
 const CONSTRAINT_MESSAGES: Record<string, string> = {
-  deals_split_matches: "Cash portion + financed has to equal the price.",
+  deals_split_matches: "Cash + card + financed has to equal the price.",
   deals_financed_needs_lender: "A financed amount needs a lender. Pick the lender first.",
   deals_install_after_sale: "Install date can't be more than 30 days before the sale date.",
   deals_override_reason: "That change needs a reason recorded.",
@@ -41,11 +41,11 @@ export async function applyEdit(
   try {
     return await tx(actor, async (c) => {
       const { rows } = await c.query(
-        "select version, sale_date::text, price_cents, cash_portion_cents, financed_portion_cents, override_reason from deals where id = $1 for update",
+        "select version, sale_date::text, price_cents, cash_portion_cents, card_portion_cents, financed_portion_cents, override_reason from deals where id = $1 for update",
         [dealId],
       );
       const cur = rows[0] as
-        | { version: number; sale_date: string; price_cents: number; cash_portion_cents: number; financed_portion_cents: number; override_reason: string | null }
+        | { version: number; sale_date: string; price_cents: number; cash_portion_cents: number; card_portion_cents: number; financed_portion_cents: number; override_reason: string | null }
         | undefined;
       if (!cur) throw new EditError("That deal no longer exists.", 404);
       if (cur.version !== version) {
@@ -71,7 +71,7 @@ export async function applyEdit(
     id: string,
     key: FieldKey,
     v: unknown,
-    cur: { sale_date: string; price_cents: number; cash_portion_cents: number; financed_portion_cents: number; override_reason: string | null },
+    cur: { sale_date: string; price_cents: number; cash_portion_cents: number; card_portion_cents: number; financed_portion_cents: number; override_reason: string | null },
   ) {
     const set = (sql: string, params: unknown[]) => c.query(`update deals set ${sql} where id = $1`, [id, ...params]);
     switch (def.kind) {
@@ -80,25 +80,32 @@ export async function applyEdit(
         return set(`${def.column} = $2`, [v === "" ? null : v]);
 
       case "money": {
-        // Cash + financed must equal the price, so the split moves together:
-        //   price     → all-financed deals stay all-financed; otherwise financed stays and cash absorbs the change
-        //   financed  → cash = price − financed
-        //   cash      → financed = price − cash
+        // Cash + card + financed must equal the price, so the split moves together:
+        //   price     → all-financed deals stay all-financed; otherwise financed and card stay and cash absorbs it
+        //   financed  → cash = price − card − financed
+        //   card      → cash = price − financed − card
+        //   cash      → financed = price − card − cash
         const n = v as number;
         const price = cur.price_cents;
+        const card = cur.card_portion_cents;
+        const fin = Number(cur.financed_portion_cents);
         if (key === "priceCents") {
-          const allFin = cur.cash_portion_cents === 0 && cur.financed_portion_cents === price;
+          const allFin = cur.cash_portion_cents === 0 && card === 0 && fin === price;
           if (allFin) return set("price_cents = $2, financed_portion_cents = $2", [n]);
-          if (n < cur.financed_portion_cents) throw new EditError("The price can't be less than the financed amount. Lower the financed amount first.", 400);
-          return set("price_cents = $2, cash_portion_cents = $2 - financed_portion_cents", [n]);
+          if (n < fin + card) throw new EditError("The price can't be less than the card and financed amounts. Lower those first.", 400);
+          return set("price_cents = $2, cash_portion_cents = $2 - financed_portion_cents - card_portion_cents", [n]);
         }
         if (key === "financedPortionCents") {
-          if (n > price) throw new EditError("Financed can't be more than the price.", 400);
-          return set("financed_portion_cents = $2, cash_portion_cents = price_cents - $2", [n]);
+          if (n + card > price) throw new EditError("Financed plus card can't be more than the price.", 400);
+          return set("financed_portion_cents = $2, cash_portion_cents = price_cents - card_portion_cents - $2", [n]);
+        }
+        if (key === "cardPortionCents") {
+          if (n + fin > price) throw new EditError("Card plus financed can't be more than the price.", 400);
+          return set("card_portion_cents = $2, cash_portion_cents = price_cents - financed_portion_cents - $2", [n]);
         }
         if (key === "cashPortionCents") {
-          if (n > price) throw new EditError("Cash can't be more than the price.", 400);
-          return set("cash_portion_cents = $2, financed_portion_cents = price_cents - $2", [n]);
+          if (n + card > price) throw new EditError("Cash plus card can't be more than the price.", 400);
+          return set("cash_portion_cents = $2, financed_portion_cents = price_cents - card_portion_cents - $2", [n]);
         }
         return set(`${def.column} = $2`, [n]);
       }

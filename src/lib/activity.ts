@@ -9,8 +9,8 @@
  */
 import { db } from "./db";
 
-export type ActivityKind = "sale" | "install" | "payout" | "po_ordered" | "po_received" | "po_cancelled" | "adjustment";
-export const FORM_KINDS: ActivityKind[] = ["sale", "install", "payout"];
+export type ActivityKind = "sale" | "install" | "payout" | "funding" | "po_ordered" | "po_received" | "po_cancelled" | "adjustment";
+export const FORM_KINDS: ActivityKind[] = ["sale", "install", "payout", "funding"];
 export const INVENTORY_KINDS: ActivityKind[] = ["po_ordered", "po_received", "po_cancelled", "adjustment"];
 
 export interface ActivityItem {
@@ -37,8 +37,11 @@ sale_install as (
          d.id::text as deal_id, d.number as deal_number, d.customer_name as customer,
          case fs.kind when 'sale' then d.price_cents
                       when 'payout' then (fs.payload ->> 'totalCents')::bigint
+                      when 'funding' then (fs.payload ->> 'amountCents')::bigint
                       else nullif((fs.payload #>> '{collected,amountCents}')::bigint, 0) end as amount_cents,
-         case when fs.kind = 'payout' then
+         case when fs.kind = 'funding' then
+                coalesce(d_lender.name, 'Lender') || ' · fee $' || to_char((fs.payload ->> 'lenderFeeCents')::numeric / 100, 'FM999,999,990.00')
+              when fs.kind = 'payout' then
                 jsonb_array_length(fs.payload -> 'lines') || ' deal' || case when jsonb_array_length(fs.payload -> 'lines') = 1 then '' else 's' end
                 || ' · ' || (fs.payload ->> 'method') || coalesce(' ' || nullif(fs.payload ->> 'reference', ''), '')
               else (select string_agg(dl.qty || '× ' || dl.sku_code, ', ' order by dl.sku_code) from deal_lines dl where dl.deal_id = d.id) end as items,
@@ -48,6 +51,7 @@ sale_install as (
   left join deals d on d.id = fs.deal_id
   left join locations l on l.id = d.location_id
   left join people p on p.id = fs.submitted_by
+  left join lenders d_lender on d_lender.id = d.lender_id
 ),
 po_lines as (
   select po_id, string_agg(qty || '× ' || sku_code, ', ' order by sku_code) as items, sum(qty * unit_cost_cents) as total

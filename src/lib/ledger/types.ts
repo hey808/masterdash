@@ -55,10 +55,13 @@ export interface Deal {
 
   priceCents: Cents;
   cashPortionCents: Cents;
+  /** Part of the price the customer pays by card. */
+  cardPortionCents: Cents;
   financedPortionCents: Cents;
   splitException: string | null;
   lender: string | null;
 
+  /** Stamped at sale before 2026-10-21; history only. The fee is now recorded at funding. */
   lenderRate: number;
   commissionRate: number;
   commissionRateSource: "plan" | "override";
@@ -88,7 +91,25 @@ export interface Deal {
   payouts: Payout[];
 }
 
-export type Stage = "cancelled" | "sold" | "installed" | "collected" | "closed";
+/**
+ * Where a deal is (Cade, 2026-10-21):
+ *   awaiting-install   sold, install date not here yet (or none set)
+ *   needs-attention    install date passed and no install recorded
+ *   awaiting-payment   installed, the customer still owes
+ *   awaiting-funding   installed, the customer is square, the lender hasn't funded
+ *   collected          installed, nothing owed
+ *   closed / cancelled set by hand
+ */
+export type Stage = "cancelled" | "awaiting-install" | "needs-attention" | "awaiting-payment" | "awaiting-funding" | "collected" | "closed";
+export const STAGE_LABEL: Record<Stage, string> = {
+  "awaiting-install": "Awaiting install",
+  "needs-attention": "Needs attention",
+  "awaiting-payment": "Awaiting payment",
+  "awaiting-funding": "Awaiting funding",
+  collected: "Collected",
+  closed: "Closed",
+  cancelled: "Cancelled",
+};
 
 /** Earned / paid / owed for one payout kind on one deal. */
 export interface PayoutPosition {
@@ -110,6 +131,7 @@ export interface DerivedDeal extends Deal {
   revenueMonth: string | null;
   saleMonth: string;
 
+  /** Lender fee in dollars: what the lender kept, recorded with the funding. */
   loanInterestCents: Cents;
   cardFeeCents: Cents;
   feesCents: Cents;

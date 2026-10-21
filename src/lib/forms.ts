@@ -38,16 +38,18 @@ export const SaleForm = z
     products: z.array(z.object({ skuCode: z.string().min(1), qty: z.number().int().min(1).max(20) })).min(1, "Pick at least one product"),
     priceCents: cents.refine((n) => n > 0, "Price is required"),
     financedPortionCents: cents,
+    cardPortionCents: cents.optional().default(0),
     lender: z.string().min(1).nullable(),
     deposit: z.object({ amountCents: cents.refine((n) => n > 0, "Deposit amount must be more than $0"), method }).nullable(),
     installScheduledOn: date.nullable(),
     note: optText,
   })
   .superRefine((v, ctx) => {
-    if (v.financedPortionCents > v.priceCents) ctx.addIssue({ code: "custom", path: ["financedPortionCents"], message: "Financed can't be more than the price" });
+    if (v.financedPortionCents + v.cardPortionCents > v.priceCents)
+      ctx.addIssue({ code: "custom", path: ["financedPortionCents"], message: "Financed plus card can't be more than the price" });
     if (v.financedPortionCents > 0 && !v.lender) ctx.addIssue({ code: "custom", path: ["lender"], message: "Pick the lender for the financed amount" });
     if (v.deposit && v.deposit.amountCents > v.priceCents - v.financedPortionCents)
-      ctx.addIssue({ code: "custom", path: ["deposit"], message: "Deposit is more than the cash portion" });
+      ctx.addIssue({ code: "custom", path: ["deposit"], message: "Deposit is more than the cash and card amounts" });
     if (v.installScheduledOn && v.installScheduledOn < v.saleDate) ctx.addIssue({ code: "custom", path: ["installScheduledOn"], message: "Install can't be scheduled before the sale" });
   });
 
@@ -95,14 +97,14 @@ export async function submitSale(input: unknown): Promise<{ id: string; number: 
       `insert into deals (location_id, customer_name, customer_address, customer_phone, customer_email, sale_date, lead_source,
          closer_id, manager_id, setter_id, price_cents, cash_portion_cents, financed_portion_cents, lender_id,
          comp_plan_id, lender_rate, commission_rate, manager_rate, setter_rate, canvasser_rate, admin_fee_cents,
-         install_scheduled_on, note)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+         install_scheduled_on, note, card_portion_cents)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
        returning id, number`,
       [
         loc.id, v.customerName, v.customerAddress, v.customerPhone, v.customerEmail, v.saleDate, v.leadSource,
-        v.closerId, manager?.id ?? null, v.setterId ?? null, v.priceCents, v.priceCents - v.financedPortionCents, v.financedPortionCents, lenderId,
+        v.closerId, manager?.id ?? null, v.setterId ?? null, v.priceCents, v.priceCents - v.financedPortionCents - v.cardPortionCents, v.financedPortionCents, lenderId,
         plan.id, lenderRate, rate, isManagerOwnDeal ? 0 : Number(plan.manager_rate), v.setterId ? Number(plan.setter_rate) : 0,
-        Number(plan.canvasser_rate), Number(plan.admin_fee_cents), v.installScheduledOn, v.note,
+        Number(plan.canvasser_rate), Number(plan.admin_fee_cents), v.installScheduledOn, v.note, v.cardPortionCents,
       ],
     );
     const deal = rows[0] as { id: string; number: number };
@@ -242,5 +244,45 @@ export async function submitPayouts(input: unknown): Promise<PayoutResult> {
       lineCount += b.lines.length;
     }
     return { people: v.payees.length, lines: lineCount, totalCents: total };
+  });
+}
+
+/* ── Record funding ──────────────────────────────────────────────────── */
+
+export const FundingForm = z.object({
+  dealId: uuid,
+  fundedOn: date,
+  amountCents: cents.refine((n) => n > 0, "Enter what the lender sent"),
+  /** What the lender kept: financed − funded, recorded in dollars when the funding hits. */
+  lenderFeeCents: cents,
+  reference: optText,
+  note: optText,
+});
+
+/**
+ * The lender's money hit the bank: a lender payment for what they sent, carrying
+ * the fee they kept. Together they can't exceed the financed amount.
+ */
+export async function submitFunding(input: unknown): Promise<{ dealId: string; number: number }> {
+  const p = FundingForm.safeParse(input);
+  if (!p.success) throw new EditError(first(p.error), 400);
+  const v = p.data;
+  return tx("form:funding", async (c) => {
+    const d = (await c.query("select id, number, financed_portion_cents, cancelled_at from deals where id = $1 for update", [v.dealId])).rows[0];
+    if (!d) throw new EditError("That deal no longer exists.", 404);
+    if (d.cancelled_at) throw new EditError("That deal is cancelled.", 400);
+    if (Number(d.financed_portion_cents) <= 0) throw new EditError("That deal has nothing financed.", 400);
+    const prior = (await c.query("select coalesce(sum(amount_cents + fee_cents), 0)::bigint as n from payments where deal_id = $1 and source = 'lender'", [v.dealId])).rows[0];
+    const room = Number(d.financed_portion_cents) - Number(prior.n);
+    if (v.amountCents + v.lenderFeeCents > room + 50)
+      throw new EditError(`Funding plus fee is more than what's left on the loan (${(room / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}).`, 409);
+    await c.query(
+      "insert into payments (deal_id, source, method, amount_cents, fee_cents, received_on, bank_ref, note) values ($1,'lender','lender',$2,$3,$4,$5,$6)",
+      [v.dealId, v.amountCents, v.lenderFeeCents, v.fundedOn, v.reference, v.note ?? "Recorded on the funding form"],
+    );
+    // The fee recorded here replaces any fee typed by hand.
+    await c.query("update deals set loan_interest_override_cents = null, updated_at = now() where id = $1", [v.dealId]);
+    await c.query("insert into form_submissions (kind, deal_id, submitted_by, payload) values ('funding', $1, null, $2)", [v.dealId, v]);
+    return { dealId: v.dealId, number: Number(d.number) };
   });
 }
