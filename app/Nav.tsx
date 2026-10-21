@@ -62,7 +62,6 @@ export default function Nav() {
               onClick={() => setOpen(isOpen ? null : item.label)}
             >
               {item.label}
-              {current && <span className="navcur">{current.label}</span>}
               <span className="caret" aria-hidden="true">▾</span>
             </button>
             <div className="navmenu" role="menu">

@@ -378,7 +378,6 @@ table.statement td.neg-paren { color: #a10b1f; }
 .mainnav .navtop:hover, .navgroup.open .navtop { background: rgba(255, 255, 255, .08); color: #fff; }
 .mainnav .navtop.active { color: #fff; }
 .mainnav .navtop:focus-visible { outline: 2px solid #8fc2ff; outline-offset: 1px; }
-.navcur { padding: 1px 8px; border-radius: 999px; background: rgba(255, 255, 255, .14); font-size: 12.5px; font-weight: 600; }
 .caret { font-size: 10px; opacity: .7; transition: transform .15s; }
 .navgroup { position: relative; }
 .navgroup.open .caret { transform: rotate(180deg); }
@@ -393,5 +392,4 @@ table.statement td.neg-paren { color: #a10b1f; }
   .topbar { flex-wrap: wrap; gap: 4px 12px; padding: 8px 12px; }
   .topbar nav.mainnav { flex-wrap: wrap; gap: 2px; }
   .mainnav .navtop { padding: 7px 9px; font-size: 14px; }
-  .navcur { display: none; }
 }
