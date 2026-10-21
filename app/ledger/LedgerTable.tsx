@@ -168,11 +168,16 @@ function rawValue(r: DerivedDeal, f: FieldKey): unknown {
 
 type SaveResult = string | null; // error message, or null on success
 
+type NumSort = "asc" | "desc" | null;
+const sortStorage = (v: string) => `ledger.view.${v}.numSort`;
+
 export default function LedgerTable({ rows: initial, options }: { rows: DerivedDeal[]; options: LedgerOptions }) {
   const [rows, setRows] = useState(initial);
   const [view, setView] = useState<ViewKey>(DEFAULT_VIEW);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set(VIEWS[DEFAULT_VIEW].collapsed));
   const [flash, setFlash] = useState<string | null>(null);
+  // null = the view's own order (newest first, or Receivables' priority order).
+  const [numSort, setNumSort] = useState<NumSort>(null);
   const [paymentsFor, setPaymentsFor] = useState<{ id: string; source: "customer" | "lender" } | null>(null);
   const closePayments = useCallback(() => setPaymentsFor(null), []);
   const replaceRow = useCallback((d: DerivedDeal) => setRows((rs) => rs.map((r) => (r.id === d.id ? d : r))), []);
@@ -188,8 +193,16 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
     } catch {
       /* storage unavailable: use the preset */
     }
+    let dir: NumSort = null;
+    try {
+      const s = localStorage.getItem(sortStorage(v));
+      if (s === "asc" || s === "desc") dir = s;
+    } catch {
+      /* ignore */
+    }
     setView(v);
     setCollapsed(next);
+    setNumSort(dir);
     try {
       localStorage.setItem("ledger.view", v);
     } catch {
@@ -262,8 +275,28 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
   const shown = hideCollapsed ? COLUMNS.filter((c) => !collapsed.has(c.key)) : COLUMNS;
   const viewRows = (() => {
     const kept = viewDef.filter ? rows.filter(viewDef.filter) : rows;
-    return viewDef.sort ? [...kept].sort(viewDef.sort) : kept;
+    if (numSort) return [...kept].sort((a, b) => (numSort === "asc" ? a.number - b.number : b.number - a.number));
+    return viewDef.sort ? [...kept].sort(viewDef.sort) : [...kept].sort((a, b) => b.number - a.number);
   })();
+  // What the # header arrow shows; null when the view is in its own (non-number) order.
+  const numDir: NumSort = numSort ?? (viewDef.sort ? null : "desc");
+  const flipNumSort = () => {
+    const next: NumSort = numDir === "desc" ? "asc" : "desc";
+    setNumSort(next);
+    try {
+      localStorage.setItem(sortStorage(view), next);
+    } catch {
+      /* ignore */
+    }
+  };
+  const clearNumSort = () => {
+    setNumSort(null);
+    try {
+      localStorage.removeItem(sortStorage(view));
+    } catch {
+      /* ignore */
+    }
+  };
   const hiddenCount = hideCollapsed ? COLUMNS.length - shown.length : 0;
 
   const pin = (key: string) =>
@@ -290,6 +323,11 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
             Reset {VIEWS[view].label} columns
           </button>
         )}
+        {viewDef.sort && numSort && (
+          <button type="button" className="linkbtn" onClick={clearNumSort}>
+            Back to {VIEWS[view].label} order
+          </button>
+        )}
         {viewDef.note && <span className="view-note">{viewDef.note}</span>}
         {hiddenCount > 0 && !viewDef.note && <span>{hiddenCount} columns hidden in this view. Switch to All Deals to see them.</span>}
         <span className="legend">White cells: click to edit. Shaded cells are calculated. Click a Customer Collected or Lender Collected amount to record a payment.</span>
@@ -308,7 +346,17 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
                 const p = pin(c.key);
                 return (
                   <th key={c.key} className={`${c.num ? "num" : ""} ${p.cls} ${isC ? "col-collapsed" : ""}`} style={p.style}>
-                    {isC ? (
+                    {c.key === "number" ? (
+                      <button
+                        type="button"
+                        className="sortbtn"
+                        onClick={flipNumSort}
+                        title={numDir === "desc" ? "Newest first. Click for oldest first." : numDir === "asc" ? "Oldest first. Click for newest first." : "Sort by deal number"}
+                        aria-label={`Sort by deal number, ${numDir === "desc" ? "currently newest first" : numDir === "asc" ? "currently oldest first" : "not sorted"}`}
+                      >
+                        # <span aria-hidden="true">{numDir === "desc" ? "▼" : numDir === "asc" ? "▲" : "↕"}</span>
+                      </button>
+                    ) : isC ? (
                       <button type="button" className="colbtn" onClick={() => toggle(c.key)} title={`Show ${c.label}`} aria-label={`Show ${c.label} column`}>+</button>
                     ) : (
                       <span className="th-inner">

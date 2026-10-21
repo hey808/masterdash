@@ -84,6 +84,10 @@ th.col-collapsed, td.col-collapsed { width: 28px; min-width: 28px; max-width: 28
 th.col-collapsed { background-image: none; }
 .linkbtn { border: 0; background: none; padding: 0; color: var(--blue); font: inherit; cursor: pointer; text-decoration: underline; }
 @media (hover: none) { .colbtn { opacity: 1; } }
+.sortbtn { border: 0; background: transparent; padding: 2px 4px; margin: -2px -4px; border-radius: 4px; font: inherit; color: inherit; cursor: pointer; white-space: nowrap; }
+.sortbtn span { font-size: 9px; color: var(--blue); margin-left: 2px; }
+.sortbtn:hover { background: var(--line); }
+.sortbtn:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
 
 /* Editable vs calculated cells */
 td.calc { background: #f7f9fc; color: #3c4a63; }
