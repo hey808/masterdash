@@ -149,3 +149,69 @@ export async function submitInstall(input: unknown): Promise<{ id: string; numbe
     return { id: d.id as string, number: Number(d.number) };
   });
 }
+
+/* ── Payout form ─────────────────────────────────────────────────────── */
+
+const PAYOUT_KINDS = ["closer", "override", "setter", "canvasser", "installer"] as const;
+
+export const PayoutForm = z.object({
+  personId: uuid,
+  paidOn: date,
+  method: z.enum(["check", "zelle", "cashapp", "venmo", "ach", "cash", "other"]),
+  reference: optText, // check number, confirmation id
+  note: optText,
+  lines: z
+    .array(z.object({ dealId: uuid, kind: z.enum(PAYOUT_KINDS), amountCents: cents.refine((n) => n > 0, "Each line needs an amount") }))
+    .min(1, "Pick at least one deal to pay")
+    .max(200),
+});
+
+/** Who a payout kind belongs to on a deal. */
+const KIND_PERSON_COL: Record<(typeof PAYOUT_KINDS)[number], string> = {
+  closer: "closer_id",
+  override: "manager_id",
+  setter: "setter_id",
+  canvasser: "canvasser_id",
+  installer: "installer_id",
+};
+
+/**
+ * One payment to one person, split across their deals. Each line becomes a payout row
+ * dated paidOn; the method and reference go on every row so the bank line can be matched.
+ */
+export async function submitPayout(input: unknown): Promise<{ count: number; totalCents: number }> {
+  const p = PayoutForm.safeParse(input);
+  if (!p.success) throw new EditError(first(p.error), 400);
+  const v = p.data;
+  const seen = new Set<string>();
+  for (const l of v.lines) {
+    const k = `${l.dealId}:${l.kind}`;
+    if (seen.has(k)) throw new EditError("The same deal is on the payout twice.", 400);
+    seen.add(k);
+  }
+  return tx("form:payout", async (c) => {
+    const person = await c.query("select name from people where id = $1", [v.personId]);
+    if (!person.rowCount) throw new EditError("Pick who's being paid.", 400);
+    const ref = [v.method === "check" && v.reference ? `Check #${v.reference.replace(/^#/, "")}` : v.reference, v.note].filter(Boolean).join(" · ") || null;
+    let total = 0;
+    for (const l of v.lines) {
+      const d = await c.query(`select number, cancelled_at, ${KIND_PERSON_COL[l.kind]} as person_id from deals where id = $1 for update`, [l.dealId]);
+      const row = d.rows[0];
+      if (!row) throw new EditError("One of those deals no longer exists. Reload and try again.", 404);
+      if (row.cancelled_at) throw new EditError(`Deal #${row.number} is cancelled; nothing is owed on it.`, 400);
+      if (row.person_id !== v.personId) throw new EditError(`${person.rows[0].name} isn't the ${l.kind} on deal #${row.number}.`, 400);
+      await c.query(
+        "insert into payouts (deal_id, person_id, kind, amount_cents, paid_on, method, note) values ($1,$2,$3,$4,$5,$6,$7)",
+        [l.dealId, v.personId, l.kind, l.amountCents, v.paidOn, v.method, ref],
+      );
+      await c.query("update deals set updated_at = now() where id = $1", [l.dealId]);
+      total += l.amountCents;
+    }
+    await c.query("insert into form_submissions (kind, deal_id, submitted_by, payload) values ('payout', $1, $2, $3)", [
+      v.lines.length === 1 ? v.lines[0]!.dealId : null,
+      v.personId,
+      { ...v, totalCents: total },
+    ]);
+    return { count: v.lines.length, totalCents: total };
+  });
+}

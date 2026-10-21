@@ -9,8 +9,8 @@
  */
 import { db } from "./db";
 
-export type ActivityKind = "sale" | "install" | "po_ordered" | "po_received" | "po_cancelled" | "adjustment";
-export const FORM_KINDS: ActivityKind[] = ["sale", "install"];
+export type ActivityKind = "sale" | "install" | "payout" | "po_ordered" | "po_received" | "po_cancelled" | "adjustment";
+export const FORM_KINDS: ActivityKind[] = ["sale", "install", "payout"];
 export const INVENTORY_KINDS: ActivityKind[] = ["po_ordered", "po_received", "po_cancelled", "adjustment"];
 
 export interface ActivityItem {
@@ -36,8 +36,12 @@ sale_install as (
   select fs.id::text as id, fs.kind, fs.created_at as at, l.name as location, p.name as who,
          d.id::text as deal_id, d.number as deal_number, d.customer_name as customer,
          case fs.kind when 'sale' then d.price_cents
+                      when 'payout' then (fs.payload ->> 'totalCents')::bigint
                       else nullif((fs.payload #>> '{collected,amountCents}')::bigint, 0) end as amount_cents,
-         (select string_agg(dl.qty || '× ' || dl.sku_code, ', ' order by dl.sku_code) from deal_lines dl where dl.deal_id = d.id) as items,
+         case when fs.kind = 'payout' then
+                jsonb_array_length(fs.payload -> 'lines') || ' deal' || case when jsonb_array_length(fs.payload -> 'lines') = 1 then '' else 's' end
+                || ' · ' || (fs.payload ->> 'method') || coalesce(' ' || nullif(fs.payload ->> 'reference', ''), '')
+              else (select string_agg(dl.qty || '× ' || dl.sku_code, ', ' order by dl.sku_code) from deal_lines dl where dl.deal_id = d.id) end as items,
          null::bigint as po_number, null::text as vendor,
          nullif(trim(fs.payload ->> 'note'), '') as detail
   from form_submissions fs

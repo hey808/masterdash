@@ -10,6 +10,7 @@ type Show = keyof typeof SHOW;
 const LABEL: Record<ActivityItem["kind"], string> = {
   sale: "Sale",
   install: "Install",
+  payout: "Payout",
   po_ordered: "PO ordered",
   po_received: "PO received",
   po_cancelled: "PO cancelled",
@@ -94,6 +95,8 @@ function Line({ it }: { it: ActivityItem }) {
       return <span><strong>{it.who ?? "Someone"}</strong> sold {deal}{it.items ? <span className="muted"> · {it.items}</span> : null}</span>;
     case "install":
       return <span><strong>{it.who ?? "Someone"}</strong> installed {deal}{it.items ? <span className="muted"> · {it.items} left the warehouse</span> : null}{it.amountCents != null ? <span className="muted"> · collected</span> : null}</span>;
+    case "payout":
+      return <span>Paid <strong>{it.who ?? "someone"}</strong>{it.items ? <span className="muted"> · {it.items}</span> : null}</span>;
     case "po_ordered":
       return <span><strong>{po(it.poNumber)}</strong> ordered from {it.vendor}{it.items ? <span className="muted"> · {it.items}</span> : null}</span>;
     case "po_received":
