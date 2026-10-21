@@ -282,3 +282,27 @@ td.strong { font-weight: 700; }
 .section-head .btn-primary { margin-left: auto; }
 .po-lines select, .po-lines input { padding: 5px 6px; border: 1px solid var(--line); border-radius: 5px; font: 13px var(--font-body); }
 .po-lines input { width: 90px; text-align: right; }
+
+/* Activity feed */
+tbody tr:target td { background: #fff7d6; }
+tbody tr[id^="deal-"] { scroll-margin-top: 120px; }
+.activity-day { margin-bottom: 18px; }
+.activity { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.act { display: grid; grid-template-columns: 76px 120px 1fr 120px 100px; gap: 12px; align-items: baseline; padding: 10px 14px; border-top: 1px solid var(--line); font-size: 14px; }
+.act:first-child { border-top: 0; }
+.act-time { color: var(--muted); font-variant-numeric: tabular-nums; }
+.act-kind { justify-self: start; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; background: var(--mist); color: var(--navy); }
+.act-kind.k-sale { background: #e3efff; color: #0a4fae; }
+.act-kind.k-install { background: #e2f6ea; color: #17673a; }
+.act-kind.k-po_received { background: #e2f6ea; color: #17673a; }
+.act-kind.k-po_cancelled { background: #fde7ea; color: #a10b1f; }
+.act-kind.k-adjustment { background: #fff1d6; color: #8a5a00; }
+.act-body a { color: var(--navy); font-weight: 600; }
+.act-detail { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+.act-loc { color: var(--muted); }
+.act-amt { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+@media (max-width: 760px) {
+  .act { grid-template-columns: 64px 1fr; row-gap: 4px; }
+  .act-body { grid-column: 1 / -1; }
+  .act-loc, .act-amt { text-align: left; }
+}

@@ -365,7 +365,7 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
           </thead>
           <tbody>
             {viewRows.map((r) => (
-              <tr key={r.id}>
+              <tr key={r.id} id={`deal-${r.number}`}>
                 {shown.map((c) => {
                   const isC = collapsed.has(c.key);
                   const p = pin(c.key);
