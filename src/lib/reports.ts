@@ -13,6 +13,7 @@
  * Balance sheet (today): bank balance, receivables, shelf inventory, what we owe on
  * installed deals, deposits on jobs not installed. Equity is the balancing figure.
  */
+import { STAGE_LABEL } from "./ledger/types";
 import { accountBalances, loadCategories, loadTransactions, openingBalance, type BankCategory, type BankTxn } from "./bank";
 import { loadStock } from "./inventory";
 import { addDays } from "./ledger/payrun";
@@ -283,6 +284,57 @@ export interface HomeMetrics {
   bankThrough: string | null;
   reps: PersonStat[];
   installers: PersonStat[];
+  /** The period split into days, weeks or months for the charts. */
+  buckets: Bucket[];
+  bucketSize: "day" | "week" | "month";
+  /** Cash in vs expenses: never finer than weeks (daily bank lines are too spiky to read). */
+  cashBuckets: Bucket[];
+  cashBucketSize: "day" | "week" | "month";
+  /** Open deals by stage, as of today. */
+  pipeline: Array<{ stage: string; label: string; deals: number; cents: number }>;
+}
+
+export interface Bucket {
+  start: string;
+  end: string;
+  label: string;
+  soldCents: number;
+  soldDeals: number;
+  collectedCents: number;
+  expensesCents: number;
+}
+
+const shiftDay = (d: string, n: number) => new Date(Date.parse(`${d}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+const span = (a: string, b: string) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86_400_000) + 1;
+
+/** Days up to ~5 weeks, weeks (Monday) up to ~7 months, months beyond. */
+export function makeBuckets(from: string, to: string, minSize: "day" | "week" = "day"): { size: "day" | "week" | "month"; buckets: Array<Pick<Bucket, "start" | "end" | "label">> } {
+  const days = Math.max(span(from, to), minSize === "week" ? 36 : 0);
+  const fmt = (d: string, o: Intl.DateTimeFormatOptions) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { ...o, timeZone: "UTC" });
+  const out: Array<Pick<Bucket, "start" | "end" | "label">> = [];
+  if (days <= 35) {
+    for (let d = from; d <= to; d = shiftDay(d, 1)) out.push({ start: d, end: d, label: fmt(d, { month: "short", day: "numeric" }) });
+    return { size: "day", buckets: out };
+  }
+  if (days <= 210) {
+    let d = shiftDay(from, -((new Date(`${from}T12:00:00Z`).getUTCDay() + 6) % 7));
+    for (; d <= to && d <= shiftDay(to, 0); d = shiftDay(d, 7)) out.push({ start: d < from ? from : d, end: shiftDay(d, 6) > to ? to : shiftDay(d, 6), label: fmt(d, { month: "short", day: "numeric" }) });
+    return { size: "week", buckets: out };
+  }
+  let y = Number(from.slice(0, 4));
+  let m = Number(from.slice(5, 7)) - 1;
+  for (;;) {
+    const start = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
+    if (start > to) break;
+    const end = shiftDay(new Date(Date.UTC(y, m + 1, 1)).toISOString().slice(0, 10), -1);
+    out.push({ start: start < from ? from : start, end: end > to ? to : end, label: fmt(start, { month: "short", year: "2-digit" }) });
+    m++;
+    if (m > 11) {
+      m = 0;
+      y++;
+    }
+  }
+  return { size: "month", buckets: out };
 }
 
 /** Metrics for `from` through `to`, inclusive (receivables are as of today). */
@@ -321,7 +373,44 @@ export async function homeMetrics(today: string, from: string, to: string = toda
 
   // Business spending: everything out of the bank except loans, owner draws and moves between our accounts.
   const spendKinds = new Set(["ledger", "cogs", "opex", "uncategorized"]);
+  const spend = txns.filter((t) => spendKinds.has(t.kind) && t.amountCents < 0);
+
+  // Charts: "all time" starts at the first sale, not 2000.
+  const first = l.map((d) => d.saleDate).sort()[0] ?? to;
+  const chartFrom = from < first ? first : from;
+  const { size, buckets: shells } = makeBuckets(chartFrom, to);
+  const bucketOf = (day: string) => shells.findIndex((b) => day >= b.start && day <= b.end);
+  const buckets: Bucket[] = shells.map((b) => ({ ...b, soldCents: 0, soldDeals: 0, collectedCents: 0, expensesCents: 0 }));
+  for (const d of sold) {
+    const i = bucketOf(d.saleDate);
+    if (i >= 0) {
+      buckets[i]!.soldCents += d.priceCents;
+      buckets[i]!.soldDeals++;
+    }
+  }
+  const cash = makeBuckets(chartFrom, to, "week");
+  const cashBuckets: Bucket[] = cash.buckets.map((b) => ({ ...b, soldCents: 0, soldDeals: 0, collectedCents: 0, expensesCents: 0 }));
+  const cashOf = (day: string) => cash.buckets.findIndex((b) => day >= b.start && day <= b.end);
+  for (const c of collected) {
+    const i = cashOf(c.on);
+    if (i >= 0) cashBuckets[i]!.collectedCents += c.amountCents;
+  }
+  for (const t of spend) {
+    const i = cashOf(t.postedOn);
+    if (i >= 0) cashBuckets[i]!.expensesCents -= t.amountCents;
+  }
+  const open = l.filter((d) => d.stage !== "closed" && d.stage !== "collected");
+  const pipeline = (["needs-attention", "awaiting-install", "awaiting-payment", "awaiting-funding"] as const).map((stage) => {
+    const ds = open.filter((d) => d.stage === stage);
+    return { stage, label: STAGE_LABEL[stage], deals: ds.length, cents: sumCents(ds.map((d) => d.priceCents)) };
+  });
+
   return {
+    buckets,
+    bucketSize: size,
+    cashBuckets,
+    cashBucketSize: cash.size,
+    pipeline,
     from,
     to,
     revenueCents: sumCents(installed.map((d) => d.priceCents)),
@@ -335,7 +424,7 @@ export async function homeMetrics(today: string, from: string, to: string = toda
     soldInstalled: sold.filter((d) => d.isInstalled).length,
     backlogDueCents: sumCents(backlog.map(due)),
     backlogDeals: backlog.length,
-    expensesCents: -sumCents(txns.filter((t) => spendKinds.has(t.kind) && t.amountCents < 0).map((t) => t.amountCents)),
+    expensesCents: -sumCents(spend.map((t) => t.amountCents)),
     bankThrough: balances.map((b) => b.lastOn).filter(Boolean).sort().at(-1) ?? null,
     reps: rank(sold, (d) => d.closer?.name ?? null),
     installers: rank(installed, (d) => d.installer?.name ?? null),

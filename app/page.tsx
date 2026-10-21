@@ -1,3 +1,4 @@
+import HomeCharts from "./HomeCharts";
 import { attachDispositions } from "@/lib/appointments";
 import { shortDate, todayET } from "@/lib/dates";
 import { fmt } from "@/lib/money";
@@ -40,6 +41,8 @@ export default async function Home({ searchParams }: { searchParams: { frame?: s
         <Big label="Due after install" value={fmt(m.backlogDueCents)} href="/ledger" note={`Today, all time: ${m.backlogDeals} sold job${m.backlogDeals === 1 ? "" : "s"} not installed yet`} />
         <Big label="Expenses" value={fmt(m.expensesCents)} href="/reports" flag={bankBehind ? `Bank through ${shortDate(m.bankThrough)}` : m.bankThrough == null ? "Import bank statements" : undefined} />
       </div>
+
+      <HomeCharts buckets={m.buckets} size={m.bucketSize} cashBuckets={m.cashBuckets} cashSize={m.cashBucketSize} pipeline={m.pipeline} />
 
       <section className="home-cal">
         <div className="home-cal-head">
