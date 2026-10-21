@@ -1,8 +1,7 @@
 import { todayET } from "@/lib/dates";
 import { loadCalendar, type CalEvent } from "@/lib/ghl";
-import { addDays } from "@/lib/ledger/payrun";
-import { mondayOf, weekDays, weekWindow } from "@/lib/week";
-import Week from "./Week";
+import { gridWindow, monthGrid, monthLabel, monthOf, shiftMonth } from "@/lib/month";
+import Month from "./Month";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Calendar" };
@@ -12,24 +11,23 @@ type Show = keyof typeof SHOW;
 const LOCS = { all: "All locations", wilmington: "Wilmington", "myrtle-beach": "Myrtle Beach" } as const;
 type Loc = keyof typeof LOCS;
 
-const label = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-
-export default async function CalendarPage({ searchParams }: { searchParams: { week?: string; show?: string; loc?: string } }) {
+export default async function CalendarPage({ searchParams }: { searchParams: { month?: string; day?: string; show?: string; loc?: string } }) {
   const today = todayET();
-  const thisMonday = mondayOf(today);
-  const monday = searchParams.week && /^\d{4}-\d{2}-\d{2}$/.test(searchParams.week) ? mondayOf(searchParams.week) : thisMonday;
+  const thisMonth = monthOf(today);
+  const month = searchParams.month && /^\d{4}-\d{2}$/.test(searchParams.month) ? searchParams.month : thisMonth;
   const show: Show = searchParams.show && searchParams.show in SHOW ? (searchParams.show as Show) : "all";
   const loc: Loc = searchParams.loc && searchParams.loc in LOCS ? (searchParams.loc as Loc) : "all";
-  const days = weekDays(monday);
-  const [from, to] = weekWindow(monday);
-  const { events, problems } = await loadCalendar(from, to);
+  const days = monthGrid(month);
+  // The selected day: from the link if it's on this grid, else today (this month) or the 1st.
+  const day = searchParams.day && days.includes(searchParams.day) ? searchParams.day : month === thisMonth ? today : `${month}-01`;
+  const { events, problems } = await loadCalendar(...gridWindow(days));
   const shown = events.filter((e: CalEvent) => days.includes(e.day) && (show === "all" || e.kind === show) && (loc === "all" || e.location === loc));
-  const counts = { sales: shown.filter((e) => e.kind === "sales" && e.status !== "cancelled").length, install: shown.filter((e) => e.kind === "install" && e.status !== "cancelled").length };
+  const inMonth = shown.filter((e) => e.day.startsWith(month) && e.status !== "cancelled");
 
-  const href = (p: { week?: string; show?: Show; loc?: Loc }) => {
+  const href = (p: { month?: string; show?: Show; loc?: Loc }) => {
     const q = new URLSearchParams();
-    const w = p.week ?? monday;
-    if (w !== thisMonday) q.set("week", w);
+    const m = p.month ?? month;
+    if (m !== thisMonth) q.set("month", m);
     if ((p.show ?? show) !== "all") q.set("show", p.show ?? show);
     if ((p.loc ?? loc) !== "all") q.set("loc", p.loc ?? loc);
     const s = q.toString();
@@ -41,10 +39,10 @@ export default async function CalendarPage({ searchParams }: { searchParams: { w
       <div className="page-head">
         <h1>Calendar</h1>
         <div className="page-actions cal-weeknav">
-          <a className="btn-ghost" href={href({ week: addDays(monday, -7) })} aria-label="Previous week">←</a>
-          <span className="cal-range">{label(days[0]!)} to {label(days[6]!)}</span>
-          <a className="btn-ghost" href={href({ week: addDays(monday, 7) })} aria-label="Next week">→</a>
-          {monday !== thisMonday && <a className="btn-outline page-btn" href={href({ week: thisMonday })}>This week</a>}
+          <a className="btn-ghost" href={href({ month: shiftMonth(month, -1) })} aria-label="Previous month">←</a>
+          <span className="cal-range">{monthLabel(month)}</span>
+          <a className="btn-ghost" href={href({ month: shiftMonth(month, 1) })} aria-label="Next month">→</a>
+          {month !== thisMonth && <a className="btn-outline page-btn" href={href({ month: thisMonth })}>Today</a>}
         </div>
       </div>
       <div className="table-bar">
@@ -58,14 +56,16 @@ export default async function CalendarPage({ searchParams }: { searchParams: { w
             <a key={l} href={href({ loc: l })} className={l === loc ? "on" : ""}>{LOCS[l]}</a>
           ))}
         </nav>
-        <span className="muted">{counts.sales} sales appointments · {counts.install} installs</span>
+        <span className="muted">
+          {monthLabel(month)}: {inMonth.filter((e) => e.kind === "sales").length} sales appointments · {inMonth.filter((e) => e.kind === "install").length} installs
+        </span>
       </div>
       {problems.length > 0 && (
         <ul className="report-flags">
           {problems.map((p, i) => <li key={i}>{p.location}: {p.message}</li>)}
         </ul>
       )}
-      <Week days={days} events={shown} today={today} />
+      <Month month={month} days={days} events={shown} today={today} initialDay={day} />
     </>
   );
 }

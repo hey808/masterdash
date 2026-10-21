@@ -3,23 +3,24 @@ import { fmt } from "@/lib/money";
 import { homeMetrics, type PersonStat } from "@/lib/reports";
 import { frameRange, isFrame, type Frame } from "@/lib/timeframe";
 import HomeFrame from "./HomeFrame";
-import Week from "./calendar/Week";
+import Month from "./calendar/Month";
 import { loadCalendar } from "@/lib/ghl";
-import { mondayOf, weekDays, weekWindow } from "@/lib/week";
+import { gridWindow, monthGrid, monthLabel, monthOf } from "@/lib/month";
 
 export const dynamic = "force-dynamic";
 
 const DEFAULT: Frame = "last30";
 
-export default async function Home({ searchParams }: { searchParams: { frame?: string; from?: string; to?: string } }) {
+export default async function Home({ searchParams }: { searchParams: { frame?: string; from?: string; to?: string; day?: string } }) {
   const frame: Frame = isFrame(searchParams.frame) ? searchParams.frame : DEFAULT;
   const today = todayET();
   const [rf, rt] = frameRange(frame, today, searchParams.from, searchParams.to);
-  const monday = mondayOf(today);
-  const days = weekDays(monday);
-  const [m, cal] = await Promise.all([homeMetrics(today, rf ?? "2000-01-01", rt ?? today), loadCalendar(...weekWindow(monday))]);
-  const weekEvents = cal.events.filter((e) => days.includes(e.day));
-  const upcoming = weekEvents.filter((e) => e.day >= today && e.status !== "cancelled");
+  const month = monthOf(today);
+  const days = monthGrid(month);
+  const [m, cal] = await Promise.all([homeMetrics(today, rf ?? "2000-01-01", rt ?? today), loadCalendar(...gridWindow(days))]);
+  const gridEvents = cal.events.filter((e) => days.includes(e.day));
+  const todays = gridEvents.filter((e) => e.day === today && e.status !== "cancelled");
+  const selected = searchParams.day && days.includes(searchParams.day) ? searchParams.day : today;
   const bankBehind = m.bankThrough != null && m.bankThrough < today;
 
   return (
@@ -28,9 +29,9 @@ export default async function Home({ searchParams }: { searchParams: { frame?: s
 
       <section className="home-cal">
         <div className="home-cal-head">
-          <h2 className="section">This week</h2>
+          <h2 className="section">{monthLabel(month)}</h2>
           <span className="muted">
-            {upcoming.filter((e) => e.kind === "sales").length} sales appointments and {upcoming.filter((e) => e.kind === "install").length} installs still ahead
+            Today: {todays.filter((e) => e.kind === "sales").length} sales appointments, {todays.filter((e) => e.kind === "install").length} installs
           </span>
           <a className="btn-outline page-btn" href="/calendar">Open calendar</a>
         </div>
@@ -39,7 +40,7 @@ export default async function Home({ searchParams }: { searchParams: { frame?: s
             {cal.problems.map((p, i) => <li key={i}>{p.location}: {p.message}</li>)}
           </ul>
         )}
-        <Week days={days} events={weekEvents} today={today} compact />
+        <Month month={month} days={days} events={gridEvents} today={today} initialDay={selected} compact />
       </section>
 
       <div className="table-bar home-numbers">
