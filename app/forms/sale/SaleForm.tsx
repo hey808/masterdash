@@ -2,19 +2,44 @@
 
 import { useMemo, useState } from "react";
 import { parseMoneyInput } from "@/lib/ledger/fields";
+import type { SaleAppointment } from "@/lib/appointments";
 import type { LedgerOptions } from "@/lib/ledger/options";
 import { fmt } from "@/lib/money";
 
 type Method = "check" | "zelle" | "card" | "ach" | "cash" | "other";
 
-export default function SaleForm({ options, stock, today, me }: { options: LedgerOptions; stock: Record<string, Record<string, number>>; today: string; me?: { personId: string; name: string } | null }) {
+const timeOf = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" });
+
+export default function SaleForm({ options, stock, today, me, appointments = [], apptNote, initialAppt }: {
+  options: LedgerOptions;
+  stock: Record<string, Record<string, number>>;
+  today: string;
+  me?: { personId: string; name: string } | null;
+  /** Today's sales appointments (the rep's own, or everyone's for the office). */
+  appointments?: SaleAppointment[];
+  apptNote?: string | null;
+  /** Opened from "Closed" on the appointments page: start with this one picked. */
+  initialAppt?: string;
+}) {
   const openLocations = options.locations.filter((l) => l.active);
   const closers = options.people.filter((p) => p.roles.includes("closer") || p.roles.includes("manager"));
   const setters = options.people.filter((p) => p.roles.includes("setter"));
   const defaultSetter = setters.find((p) => p.name.toLowerCase() === "adam")?.id ?? "";
 
   // No default: a wrong location would set aside stock from the wrong warehouse.
-  const [location, setLocation] = useState("");
+  const first = appointments.find((a) => a.id === initialAppt && a.soldDealNumber == null) ?? null;
+  const [location, setLocation] = useState(first?.location ?? "");
+  // Step one: which of today's appointments is this sale from? (Or none: typed by hand.)
+  const [appt, setAppt] = useState<SaleAppointment | null>(first);
+  const [manual, setManual] = useState(appointments.length === 0);
+  // The sale happened on the appointment's day (Eastern), never later than today.
+  const apptDay = appt ? new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(appt.start)) : today;
+  const saleDay = apptDay < today ? apptDay : today;
+  const pick = (a: SaleAppointment) => {
+    setAppt(a);
+    setLocation(a.location);
+    window.scrollTo({ top: 0 });
+  };
   const [qty, setQty] = useState<Record<string, number>>({});
   const [price, setPrice] = useState("");
   const [financed, setFinanced] = useState("");
@@ -61,6 +86,7 @@ export default function SaleForm({ options, stock, today, me }: { options: Ledge
           leadSource: f.get("leadSource") || undefined,
           products,
           priceCents,
+          appointmentId: appt?.id ?? null,
           financedPortionCents: financedCents,
           cardPortionCents: cardCents,
           lender: financedCents > 0 ? lender || null : null,
@@ -93,8 +119,42 @@ export default function SaleForm({ options, stock, today, me }: { options: Ledge
     );
   }
 
+  if (!appt && !manual) {
+    return (
+      <section className="appt-pick">
+        <h2>Which appointment are you at?</h2>
+        <p className="muted">{me ? "Your" : "Today's"} sales appointments for today. Pick one and the customer&apos;s details fill in.</p>
+        <div className="appt-list">
+          {appointments.map((a) => (
+            <button key={a.id} type="button" className="appt-card" disabled={a.soldDealNumber != null} onClick={() => pick(a)}>
+              <span className="appt-time">{timeOf(a.start)}</span>
+              <span className="appt-name">{a.customerName}</span>
+              {a.address && <span className="appt-addr">{a.address}</span>}
+              <span className="appt-meta">
+                {a.locationName}
+                {!me && a.repName ? ` · ${a.repName}` : ""}
+                {a.soldDealNumber != null ? <b className="appt-sold"> · Sold, deal #{a.soldDealNumber}</b> : null}
+              </span>
+            </button>
+          ))}
+        </div>
+        <button type="button" className="linkbtn" onClick={() => setManual(true)}>Not on the calendar? Enter the customer by hand</button>
+      </section>
+    );
+  }
+
   return (
-    <form className="field-form" onSubmit={submit}>
+    <form className="field-form" onSubmit={submit} key={appt?.id ?? "manual"}>
+      {apptNote && !appt && <p className="hint block">{apptNote}</p>}
+      {appt && (
+        <div className="appt-chosen">
+          <span>
+            From the <strong>{timeOf(appt.start)}</strong> appointment with <strong>{appt.customerName}</strong>
+            {appt.contactUrl && <> · <a href={appt.contactUrl} target="_blank" rel="noreferrer">GoHighLevel contact</a></>}
+          </span>
+          <button type="button" className="linkbtn" onClick={() => { setAppt(null); setManual(false); }}>Change</button>
+        </div>
+      )}
       <fieldset>
         <legend>The sale</legend>
         <div className="grid">
@@ -105,7 +165,7 @@ export default function SaleForm({ options, stock, today, me }: { options: Ledge
             </label>
           ) : (
             <label>Closer
-              <select name="closerId" required defaultValue="">
+              <select name="closerId" required defaultValue={appt?.repPersonId && closers.some((c) => c.id === appt.repPersonId) ? appt.repPersonId : ""}>
                 <option value="" disabled>Choose…</option>
                 {closers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
@@ -124,10 +184,10 @@ export default function SaleForm({ options, stock, today, me }: { options: Ledge
             </select>
           </label>
           <label>Sale date
-            <input name="saleDate" type="date" required defaultValue={today} max={today} />
+            <input name="saleDate" type="date" required defaultValue={saleDay} max={today} />
           </label>
           <label className="wide">Lead source
-            <input name="leadSource" placeholder="Meta, referral, door knock…" />
+            <input name="leadSource" placeholder="Meta, referral, door knock…" defaultValue={appt?.leadSource ?? ""} />
           </label>
         </div>
       </fieldset>
@@ -135,10 +195,10 @@ export default function SaleForm({ options, stock, today, me }: { options: Ledge
       <fieldset>
         <legend>Customer</legend>
         <div className="grid">
-          <label className="wide">Name<input name="customerName" required autoComplete="off" /></label>
-          <label className="wide">Service address<input name="customerAddress" required autoComplete="off" /></label>
-          <label>Phone<input name="customerPhone" type="tel" autoComplete="off" /></label>
-          <label>Email<input name="customerEmail" type="email" autoComplete="off" /></label>
+          <label className="wide">Name<input name="customerName" required autoComplete="off" defaultValue={appt?.customerName ?? ""} /></label>
+          <label className="wide">Service address<input name="customerAddress" required autoComplete="off" defaultValue={appt?.address ?? ""} /></label>
+          <label>Phone<input name="customerPhone" type="tel" autoComplete="off" defaultValue={appt?.phone ?? ""} /></label>
+          <label>Email<input name="customerEmail" type="email" autoComplete="off" defaultValue={appt?.email ?? ""} /></label>
         </div>
       </fieldset>
 

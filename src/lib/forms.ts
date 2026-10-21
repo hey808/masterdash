@@ -39,6 +39,8 @@ export const SaleForm = z
     priceCents: cents.refine((n) => n > 0, "Price is required"),
     financedPortionCents: cents,
     cardPortionCents: cents.optional().default(0),
+    /** The GoHighLevel appointment this sale came from (kept on the form submission). */
+    appointmentId: z.string().max(64).nullable().optional(),
     lender: z.string().min(1).nullable(),
     deposit: z.object({ amountCents: cents.refine((n) => n > 0, "Deposit amount must be more than $0"), method }).nullable(),
     installScheduledOn: date.nullable(),
@@ -122,6 +124,15 @@ export async function submitSale(input: unknown): Promise<{ id: string; number: 
       );
     }
     await c.query("insert into form_submissions (kind, deal_id, submitted_by, payload) values ('sale', $1, $2, $3)", [deal.id, v.closerId, v]);
+    // The appointment it came from is now closed, linked to this deal.
+    if (v.appointmentId && (await c.query("select to_regclass('appointment_dispositions') is not null as ok")).rows[0]?.ok) {
+      await c.query(
+        `insert into appointment_dispositions (appointment_id, location_id, person_id, appointment_day, customer_name, outcome, deal_id, recorded_by)
+         values ($1,$2,$3,$4,$5,'closed',$6,'form:sale')
+         on conflict (appointment_id) do update set outcome = 'closed', deal_id = excluded.deal_id, reason = null, rescheduled_to = null, updated_at = now()`,
+        [v.appointmentId, loc.id, v.closerId, v.saleDate, v.customerName, deal.id],
+      );
+    }
     return { id: deal.id, number: Number(deal.number) };
   });
 }

@@ -92,7 +92,7 @@ export async function verifySession(cookie: string | undefined | null): Promise<
 
 /** Pages and APIs each role may use. Admin may use everything. */
 const ALLOWED: Record<Exclude<Role, "admin">, RegExp[]> = {
-  sales: [/^\/me(\/|$)/, /^\/forms\/sale(\/|$)/, /^\/api\/forms\/sale$/],
+  sales: [/^\/appointments(\/|$)/, /^\/api\/appointments$/, /^\/me(\/|$)/, /^\/forms\/sale(\/|$)/, /^\/api\/forms\/sale$/],
   installer: [/^\/me(\/|$)/, /^\/forms\/install(\/|$)/, /^\/api\/forms\/install$/],
 };
 
@@ -105,4 +105,4 @@ export function canAccess(role: Role, pathname: string): boolean {
 }
 
 /** Where each role lands after signing in (and when it opens a page it can't use). */
-export const homeFor = (role: Role) => (role === "admin" ? "/" : "/me");
+export const homeFor = (role: Role) => (role === "admin" ? "/" : role === "sales" ? "/appointments" : "/me");
