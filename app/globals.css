@@ -219,3 +219,6 @@ td.col-collapsed, th.col-collapsed { width: 22px; min-width: 22px; max-width: 22
 .toggle.on .knob::after { transform: translateX(13px); }
 .toggle:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 4px; }
 @media (prefers-reduced-motion: reduce) { .toggle .knob, .toggle .knob::after { transition: none; } }
+td.age-warn { color: var(--warn); font-weight: 600; }
+td.age-bad { color: var(--red); font-weight: 700; }
+.view-note { color: var(--muted); }

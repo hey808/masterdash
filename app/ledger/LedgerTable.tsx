@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Modal from "../Modal";
 import PaymentsModal from "./PaymentsModal";
-import { shortDate } from "@/lib/dates";
+import { shortDate, todayET } from "@/lib/dates";
 import { FIELDS, parseMoneyInput, parseRateInput, type FieldDef, type FieldKey } from "@/lib/ledger/fields";
 import type { LedgerOptions } from "@/lib/ledger/options";
 import type { DealLine, DerivedDeal } from "@/lib/ledger/types";
@@ -23,6 +23,12 @@ type Col = {
   cellClass?: (r: DerivedDeal) => string;
   total?: (rows: DerivedDeal[]) => ReactNode;
 };
+
+/** Total still owed by the customer and the lender (over-funding counts as 0). */
+const outstanding = (r: DerivedDeal) => Math.max(0, r.cashDueCents) + Math.max(0, r.fundingDueCents);
+const TODAY = todayET();
+const daysSince = (d: string | null) =>
+  d == null ? null : Math.round((Date.parse(`${TODAY}T00:00:00Z`) - Date.parse(`${d}T00:00:00Z`)) / 86_400_000);
 
 const openPayouts = (r: DerivedDeal) => sumCents(r.payoutPositions.map((p) => Math.max(0, p.openCents)));
 const sum = (pick: (r: DerivedDeal) => number) => (rows: DerivedDeal[]) => fmt(sumCents(rows.map(pick)));
@@ -60,7 +66,7 @@ const COLUMNS: Col[] = [
   {
     key: "outstanding",
     label: "Total Outstanding",
-    ...money((r) => Math.max(0, r.cashDueCents) + Math.max(0, r.fundingDueCents)),
+    ...money(outstanding),
   },
   { key: "commissionRate", label: "Commission %", field: "commissionRate", num: true, cell: (r) => fmtRate(r.commissionRate) },
   { key: "managerRate", label: "Override %", field: "managerRate", num: true, cell: (r) => fmtRate(r.managerRate) },
@@ -71,6 +77,16 @@ const COLUMNS: Col[] = [
   { key: "installerPay", label: "Installer Pay", field: "installerPayCents", ...money((r) => r.installerPayCents) },
   { key: "scheduled", label: "Install Schedule", field: "installScheduledOn", cell: (r) => (r.installScheduledOn ? shortDate(r.installScheduledOn) : "") },
   { key: "installed", label: "Installed", field: "installed", cell: (r) => (r.installedOn ? "Yes" : "No") },
+  {
+    key: "daysOut",
+    label: "Days Since Install",
+    num: true,
+    cell: (r) => daysSince(r.installedOn) ?? "—",
+    cellClass: (r) => {
+      const d = daysSince(r.installedOn);
+      return d == null || outstanding(r) <= 50 ? "" : d > 60 ? "age-bad" : d > 30 ? "age-warn" : "";
+    },
+  },
   { key: "cogs", label: "Cost of Goods", ...money((r) => r.cogsCents) },
   { key: "profit", label: "Net Profit", ...money((r) => r.netProfitCents), cellClass: (r) => ((r.netProfitCents ?? 0) < 0 ? "neg" : "") },
   { key: "margin", label: "Margin", num: true, cell: (r) => (r.margin == null ? "—" : `${(r.margin * 100).toFixed(1)}%`) },
@@ -81,10 +97,35 @@ const COLUMNS: Col[] = [
 
 /** Column views. Each view starts from its preset; tweaks are remembered per view in this browser. */
 const CONSOLIDATED = ["location", "sold", "price", "cash", "financed", "fees", "collectedCustomer", "collectedLender", "outstanding", "scheduled", "installed", "profit"];
-const VIEWS = {
-  consolidated: { label: "Consolidated", collapsed: COLUMNS.filter((c) => !c.fixed && !CONSOLIDATED.includes(c.key)).map((c) => c.key) },
-  all: { label: "All Deals", collapsed: [] as string[] },
-} as const;
+const RECEIVABLES = ["location", "closer", "sold", "lender", "installed", "daysOut", "price", "collectedCustomer", "custOwes", "collectedLender", "lenderOwes", "outstanding"];
+const only = (keep: string[]) => COLUMNS.filter((c) => !c.fixed && !keep.includes(c.key)).map((c) => c.key);
+
+interface ViewDef {
+  label: string;
+  collapsed: string[];
+  /** Hide collapsed columns outright instead of showing thin strips. */
+  hide: boolean;
+  filter?: (r: DerivedDeal) => boolean;
+  sort?: (a: DerivedDeal, b: DerivedDeal) => number;
+  note?: string;
+}
+
+const VIEWS: Record<"consolidated" | "receivables" | "all", ViewDef> = {
+  consolidated: { label: "Consolidated", collapsed: only(CONSOLIDATED), hide: true },
+  receivables: {
+    label: "Receivables",
+    collapsed: only(RECEIVABLES),
+    hide: true,
+    // Only deals with money still owed. Installed jobs first (that's real AR), oldest balance first, then biggest.
+    filter: (r) => r.stage !== "cancelled" && outstanding(r) > 50,
+    sort: (a, b) =>
+      Number(b.isInstalled) - Number(a.isInstalled) ||
+      (daysSince(b.installedOn) ?? -1) - (daysSince(a.installedOn) ?? -1) ||
+      outstanding(b) - outstanding(a),
+    note: "Deals with money still owed. Installed jobs first, oldest balance on top; then jobs not installed yet.",
+  },
+  all: { label: "All Deals", collapsed: [], hide: false },
+};
 type ViewKey = keyof typeof VIEWS;
 const DEFAULT_VIEW: ViewKey = "consolidated";
 const viewStorage = (v: ViewKey) => `ledger.view.${v}.collapsed.v2`; // v2: Total Outstanding + Collected - Lender in Consolidated
@@ -216,8 +257,13 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
   }
 
   // Consolidated hides its collapsed columns outright; All Deals keeps them as thin strips you can reopen.
-  const hideCollapsed = view === "consolidated";
+  const viewDef = VIEWS[view];
+  const hideCollapsed = viewDef.hide;
   const shown = hideCollapsed ? COLUMNS.filter((c) => !collapsed.has(c.key)) : COLUMNS;
+  const viewRows = (() => {
+    const kept = viewDef.filter ? rows.filter(viewDef.filter) : rows;
+    return viewDef.sort ? [...kept].sort(viewDef.sort) : kept;
+  })();
   const hiddenCount = hideCollapsed ? COLUMNS.length - shown.length : 0;
 
   const pin = (key: string) =>
@@ -244,7 +290,8 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
             Reset {VIEWS[view].label} columns
           </button>
         )}
-        {hiddenCount > 0 && <span>{hiddenCount} columns hidden in this view. Switch to All Deals to see them.</span>}
+        {viewDef.note && <span className="view-note">{viewDef.note}</span>}
+        {hiddenCount > 0 && !viewDef.note && <span>{hiddenCount} columns hidden in this view. Switch to All Deals to see them.</span>}
         <span className="legend">White cells: click to edit. Shaded cells are calculated. Click a Customer Collected or Lender Collected amount to record a payment.</span>
       </div>
       {flash && (
@@ -277,7 +324,7 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
+            {viewRows.map((r) => (
               <tr key={r.id}>
                 {shown.map((c) => {
                   const isC = collapsed.has(c.key);
@@ -317,13 +364,13 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
               </tr>
             ))}
           </tbody>
-          {rows.length > 0 && (
+          {viewRows.length > 0 && (
             <tfoot>
               <tr>
                 {shown.map((c) => {
                   const isC = collapsed.has(c.key);
                   const p = pin(c.key);
-                  const content = isC ? null : c.key === "number" ? rows.length : c.key === "stage" ? null : c.key === "customer" ? "deals" : c.field && !c.num ? null : c.total?.(rows);
+                  const content = isC ? null : c.key === "number" ? viewRows.length : c.key === "stage" || c.key === "daysOut" ? null : c.key === "customer" ? "deals" : c.field && !c.num ? null : c.total?.(viewRows);
                   return (
                     <td key={c.key} className={`${c.num ? "num" : ""} ${p.cls} ${isC ? "col-collapsed" : ""}`} style={p.style}>
                       {content}
@@ -334,7 +381,7 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
             </tfoot>
           )}
         </table>
-        {rows.length === 0 && <p className="empty">No deals in this view.</p>}
+        {viewRows.length === 0 && <p className="empty">No deals in this view.</p>}
       </div>
       {paymentsFor && rows.find((r) => r.id === paymentsFor.id) && (
         <PaymentsModal deal={rows.find((r) => r.id === paymentsFor.id)!} initialSource={paymentsFor.source} onClose={closePayments} onDeal={replaceRow} />
