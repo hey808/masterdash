@@ -57,6 +57,11 @@ const COLUMNS: Col[] = [
   { key: "custOwes", label: "Customer Owes", ...money((r) => r.cashDueCents, (r) => Math.max(0, r.cashDueCents)), cellClass: (r) => (r.cashDueCents < 0 ? "neg" : "") },
   { key: "collectedLender", label: "Collected - Lender", ...money((r) => r.fundedCents) },
   { key: "lenderOwes", label: "Lender Owes", ...money((r) => r.fundingDueCents, (r) => Math.max(0, r.fundingDueCents)), cellClass: (r) => (r.fundingDueCents < 0 ? "neg" : "") },
+  {
+    key: "outstanding",
+    label: "Total Outstanding",
+    ...money((r) => Math.max(0, r.cashDueCents) + Math.max(0, r.fundingDueCents)),
+  },
   { key: "commissionRate", label: "Commission %", field: "commissionRate", num: true, cell: (r) => fmtRate(r.commissionRate) },
   { key: "managerRate", label: "Override %", field: "managerRate", num: true, cell: (r) => fmtRate(r.managerRate) },
   { key: "adminFee", label: "Admin Fee", field: "adminFeeCents", ...money((r) => r.adminFeeCents) },
@@ -75,14 +80,14 @@ const COLUMNS: Col[] = [
 ];
 
 /** Column views. Each view starts from its preset; tweaks are remembered per view in this browser. */
-const CONSOLIDATED = ["location", "sold", "price", "cash", "financed", "fees", "collectedCustomer", "custOwes", "scheduled", "installed", "profit"];
+const CONSOLIDATED = ["location", "sold", "price", "cash", "financed", "fees", "collectedCustomer", "collectedLender", "outstanding", "scheduled", "installed", "profit"];
 const VIEWS = {
   consolidated: { label: "Consolidated", collapsed: COLUMNS.filter((c) => !c.fixed && !CONSOLIDATED.includes(c.key)).map((c) => c.key) },
   all: { label: "All Deals", collapsed: [] as string[] },
 } as const;
 type ViewKey = keyof typeof VIEWS;
 const DEFAULT_VIEW: ViewKey = "consolidated";
-const viewStorage = (v: ViewKey) => `ledger.view.${v}.collapsed`;
+const viewStorage = (v: ViewKey) => `ledger.view.${v}.collapsed.v2`; // v2: Total Outstanding + Collected - Lender in Consolidated
 const NUM_W = 56;
 const STAGE_W = 104;
 const COLLAPSED_W = 28;
