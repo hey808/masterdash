@@ -14,10 +14,11 @@ export interface OpenJob {
   products: string;
 }
 
-export default function InstallForm({ jobs, people, today, me }: { jobs: OpenJob[]; people: Array<{ id: string; name: string; roles: string[] }>; today: string; me?: { personId: string; name: string } | null }) {
+export default function InstallForm({ jobs, people, today, me, initialDeal }: { jobs: OpenJob[]; people: Array<{ id: string; name: string; roles: string[] }>; today: string; me?: { personId: string; name: string } | null; initialDeal?: string }) {
   const installers = [...people].sort((a, b) => Number(b.roles.includes("installer")) - Number(a.roles.includes("installer")) || a.name.localeCompare(b.name));
   const [query, setQuery] = useState("");
-  const [picked, setPicked] = useState<OpenJob | null>(null);
+  // Opened from a "Record install" link: start with that job picked.
+  const [picked, setPicked] = useState<OpenJob | null>(() => jobs.find((j) => j.id === initialDeal) ?? null);
   const [collected, setCollected] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

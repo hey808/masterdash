@@ -22,7 +22,7 @@ async function openJobs(): Promise<OpenJob[]> {
   }));
 }
 
-export default async function InstallFormPage() {
+export default async function InstallFormPage({ searchParams }: { searchParams: { deal?: string } }) {
   const session = await currentSession();
   // Reps and installers submit as themselves; the API enforces it too.
   const me = session && session.role !== "admin" && session.personId ? { personId: session.personId, name: session.name } : null;
@@ -31,7 +31,7 @@ export default async function InstallFormPage() {
     <>
       <p className="crumb"><a href="/forms">Forms</a> / Installer form</p>
       <h1>Installer form</h1>
-      <InstallForm jobs={jobs} people={options.people} today={todayET()} me={me} />
+      <InstallForm jobs={jobs} people={options.people} today={todayET()} me={me} initialDeal={searchParams.deal} />
     </>
   );
 }

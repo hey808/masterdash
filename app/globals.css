@@ -899,3 +899,25 @@ table.team-cap tr.needs-slots td { background: #fffaf0; }
 .record-menu-list span { color: var(--muted); font-size: 12.5px; }
 
 .stage { white-space: nowrap; }
+
+/* Sales + Operations dashboards */
+.dash-block { margin: 6px 0 22px; }
+.week-bars { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 8px; align-items: end; height: 220px; padding: 16px 16px 10px; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+.wb { display: grid; grid-template-rows: 18px 1fr 16px 14px; height: 100%; align-items: end; justify-items: center; min-width: 0; }
+.wb-bar { width: 70%; max-width: 46px; border-radius: 6px 6px 2px 2px; background: #9cc6f9; align-self: end; }
+.wb.now .wb-bar { background: var(--blue); }
+.wb-val { font: 700 11.5px var(--font-body); color: var(--navy); }
+.wb-lbl { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.wb-n { font-size: 10.5px; color: #8a9bb8; }
+.util-chip { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 999px; background: #e5f1ff; color: var(--blue-2); font: 600 11px/18px var(--font-body); }
+.util-chip.full { background: #e2f6ea; color: #17673a; }
+.util-chip.over { background: #fde7ea; color: #b10a1f; }
+.ops-days { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x proximity; }
+.ops-day { flex: 0 0 240px; scroll-snap-align: start; padding: 12px; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+.ops-day.today { border-color: var(--blue); }
+.ops-day-head { display: flex; justify-content: space-between; margin-bottom: 8px; color: var(--navy); }
+.ops-day ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ops-day li { display: grid; gap: 1px; padding: 6px 8px; border-left: 3px solid #12804e; border-radius: 6px; background: #f2faf5; font-size: 13px; }
+.ops-day .t { font: 700 12px var(--font-body); color: var(--navy); }
+.ops-day .title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 760px) { .week-bars { gap: 3px; padding: 12px 8px 8px; } .wb-val { font-size: 9px; } .wb-lbl { font-size: 9px; } }

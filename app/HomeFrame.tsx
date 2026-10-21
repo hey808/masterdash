@@ -6,7 +6,7 @@ import type { Frame } from "@/lib/timeframe";
 import TimeFrame from "./TimeFrame";
 
 /** Home's time frame: lives in the URL so the server computes the numbers. */
-export default function HomeFrame({ frame, from, to }: { frame: Frame; from: string; to: string }) {
+export default function HomeFrame({ frame, from, to, path = "/" }: { frame: Frame; from: string; to: string; path?: string }) {
   const router = useRouter();
   const [state, setState] = useState({ frame, from, to });
   return (
@@ -23,7 +23,7 @@ export default function HomeFrame({ frame, from, to }: { frame: Frame; from: str
           q.set("from", a);
           q.set("to", b);
         }
-        router.push(`/?${q}`);
+        router.push(`${path}?${q}`);
       }}
     />
   );

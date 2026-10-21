@@ -4,13 +4,14 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 type Link = { href: string; label: string };
-type Item = Link | { label: string; links: Link[] };
+/** A group with an href: clicking the label opens that page; hovering shows the menu. */
+type Item = Link | { label: string; href?: string; links: Link[] };
 
 const ADMIN_MENU: Item[] = [
   { href: "/", label: "Home" },
-  { label: "Sales", links: [{ href: "/ledger", label: "Ledger" }, { href: "/commissions", label: "Commissions" }, { href: "/forms", label: "Forms" }] },
-  { label: "Operations", links: [{ href: "/calendar", label: "Calendar" }, { href: "/capacity", label: "Capacity" }, { href: "/inventory", label: "Inventory" }, { href: "/activity", label: "Activity" }] },
-  { label: "Finance", links: [{ href: "/bank", label: "Bank" }, { href: "/reports", label: "Reports" }] },
+  { label: "Sales", href: "/sales", links: [{ href: "/sales", label: "Dashboard" }, { href: "/ledger", label: "Ledger" }, { href: "/commissions", label: "Commissions" }, { href: "/forms", label: "Forms" }] },
+  { label: "Operations", href: "/operations", links: [{ href: "/operations", label: "Dashboard" }, { href: "/calendar", label: "Calendar" }, { href: "/capacity", label: "Capacity" }, { href: "/inventory", label: "Inventory" }, { href: "/activity", label: "Activity" }] },
+  { label: "Finance", href: "/reports", links: [{ href: "/bank", label: "Bank" }, { href: "/reports", label: "Reports" }] },
 ];
 const SALES_MENU: Item[] = [{ href: "/me", label: "My commissions" }, { href: "/forms/sale", label: "Sales form" }];
 const INSTALLER_MENU: Item[] = [{ href: "/me", label: "My commissions" }, { href: "/forms/install", label: "Installer form" }];
@@ -41,7 +42,7 @@ export default function Nav({ role, name }: { role: "admin" | "sales" | "install
   return (
     <nav ref={ref} className="mainnav">
       {MENU.map((item) => {
-        if ("href" in item) {
+        if (!("links" in item)) {
           const on = isOn(item.href, path);
           return (
             <a key={item.href} href={item.href} className={`navtop ${on ? "active" : ""}`} aria-current={on ? "page" : undefined}>
@@ -58,16 +59,23 @@ export default function Nav({ role, name }: { role: "admin" | "sales" | "install
             onMouseEnter={() => setOpen(item.label)}
             onMouseLeave={() => setOpen((o) => (o === item.label ? null : o))}
           >
-            <button
-              type="button"
-              className={`navtop ${current ? "active" : ""}`}
-              aria-expanded={isOpen}
-              aria-haspopup="true"
-              onClick={() => setOpen(isOpen ? null : item.label)}
-            >
-              {item.label}
-              <span className="caret" aria-hidden="true">▾</span>
-            </button>
+            {item.href ? (
+              <a href={item.href} className={`navtop ${current ? "active" : ""}`} aria-haspopup="true" aria-expanded={isOpen} onFocus={() => setOpen(item.label)}>
+                {item.label}
+                <span className="caret" aria-hidden="true">▾</span>
+              </a>
+            ) : (
+              <button
+                type="button"
+                className={`navtop ${current ? "active" : ""}`}
+                aria-expanded={isOpen}
+                aria-haspopup="true"
+                onClick={() => setOpen(isOpen ? null : item.label)}
+              >
+                {item.label}
+                <span className="caret" aria-hidden="true">▾</span>
+              </button>
+            )}
             <div className="navmenu" role="menu">
               {item.links.map((l) => {
                 const on = isOn(l.href, path);
