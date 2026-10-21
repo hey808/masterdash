@@ -92,7 +92,7 @@ export async function verifySession(cookie: string | undefined | null): Promise<
 
 /** Pages and APIs each role may use. Admin may use everything. */
 const ALLOWED: Record<Exclude<Role, "admin">, RegExp[]> = {
-  sales: [/^\/appointments(\/|$)/, /^\/api\/appointments$/, /^\/agreements(\/|$)/, /^\/api\/agreements(\/|$)/, /^\/me(\/|$)/, /^\/forms\/sale(\/|$)/, /^\/api\/forms\/sale$/],
+  sales: [/^\/appointments(\/|$)/, /^\/api\/appointments$/, /^\/agreements(\/|$)/, /^\/api\/agreements(\/|$)/, /^\/customers(\/|$)/, /^\/api\/customers(\/|$)/, /^\/me(\/|$)/, /^\/forms\/sale(\/|$)/, /^\/api\/forms\/sale$/],
   installer: [/^\/installs(\/|$)/, /^\/api\/appointments$/, /^\/me(\/|$)/, /^\/forms\/install(\/|$)/, /^\/api\/forms\/install$/],
 };
 

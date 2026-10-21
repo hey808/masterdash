@@ -5,6 +5,7 @@ import Modal from "../Modal";
 import TimeFrame from "../TimeFrame";
 import { FRAMES, frameRange, type Frame } from "@/lib/timeframe";
 import PaymentsModal from "./PaymentsModal";
+import CustomerModal from "./CustomerModal";
 import { shortDate, todayET } from "@/lib/dates";
 import { FIELDS, parseMoneyInput, parseRateInput, type FieldDef, type FieldKey } from "@/lib/ledger/fields";
 import type { LedgerOptions } from "@/lib/ledger/options";
@@ -217,6 +218,8 @@ export default function LedgerTable({ rows: initial, options, locations }: {
   const closeStage = useCallback(() => setStageFor(null), []);
   const [paymentsFor, setPaymentsFor] = useState<{ id: string; source: "customer" | "lender" } | null>(null);
   const closePayments = useCallback(() => setPaymentsFor(null), []);
+  const [customerFor, setCustomerFor] = useState<{ id: string; name: string } | null>(null);
+  const closeCustomer = useCallback(() => setCustomerFor(null), []);
   const replaceRow = useCallback((d: DerivedDeal) => setRows((rs) => rs.map((r) => (r.id === d.id ? d : r))), []);
 
   useEffect(() => setRows(initial), [initial]);
@@ -474,6 +477,7 @@ export default function LedgerTable({ rows: initial, options, locations }: {
                       display={c.cell(r)}
                       options={options}
                       onSave={(v) => save(r, c.field!, v)}
+                      onOpen={c.key === "customer" ? () => setCustomerFor({ id: r.id, name: r.customerName }) : undefined}
                     />
                   );
                 })}
@@ -505,6 +509,7 @@ export default function LedgerTable({ rows: initial, options, locations }: {
       {paymentsFor && rows.find((r) => r.id === paymentsFor.id) && (
         <PaymentsModal deal={rows.find((r) => r.id === paymentsFor.id)!} initialSource={paymentsFor.source} onClose={closePayments} onDeal={replaceRow} />
       )}
+      {customerFor && <CustomerModal id={customerFor.id} name={customerFor.name} onClose={closeCustomer} />}
     </>
   );
 }
@@ -519,8 +524,10 @@ function EditableCell(props: {
   display: ReactNode;
   options: LedgerOptions;
   onSave: (value: unknown) => Promise<SaveResult>;
+  /** Customer column: clicking the name opens the profile; the pencil edits. */
+  onOpen?: () => void;
 }) {
-  const { className, style, row, field, display, options, onSave } = props;
+  const { className, style, row, field, display, options, onSave, onOpen } = props;
   const kind = FIELDS[field].kind;
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -571,9 +578,9 @@ function EditableCell(props: {
       style={style}
       title={error ?? (field === "customerName" ? row.customerName : undefined)}
       tabIndex={editing ? -1 : 0}
-      onClick={() => !editing && !saving && setEditing(true)}
+      onClick={() => !editing && !saving && !onOpen && setEditing(true)}
       onKeyDown={(e) => {
-        if (!editing && (e.key === "Enter" || e.key === "F2")) {
+        if (!editing && (e.key === "F2" || (e.key === "Enter" && !onOpen))) {
           e.preventDefault();
           setEditing(true);
         }
@@ -588,6 +595,11 @@ function EditableCell(props: {
         </>
       ) : editing ? (
         <Editor kind={kind} field={field} row={row} options={options} onCommit={commit} onCancel={() => setEditing(false)} />
+      ) : onOpen ? (
+        <span className="name-cell">
+          <button type="button" className="name-link" onClick={onOpen} title="Open customer profile">{display}</button>
+          <button type="button" className="name-edit" aria-label={`Edit name: ${row.customerName}`} title="Edit name" onClick={() => !saving && setEditing(true)}>✎</button>
+        </span>
       ) : (
         display
       )}

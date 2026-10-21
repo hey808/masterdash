@@ -325,3 +325,14 @@ export async function attachDispositions<T extends CalEvent>(events: T[]): Promi
       : e;
   });
 }
+
+/** Phone, email and street address from a GoHighLevel contact (for profiles missing them). */
+export async function contactDetails(slug: GhlLocation["slug"], contactId: string): Promise<{ phone: string | null; email: string | null; address: string | null }> {
+  const loc = GHL_LOCATIONS.find((l) => l.slug === slug);
+  const c = loc ? await contact(loc, contactId) : null;
+  return {
+    phone: formatPhone(c?.phone),
+    email: c?.email?.trim() || null,
+    address: c?.address1 ? [c.address1, c.city, [c.state, c.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", ") : null,
+  };
+}

@@ -21,7 +21,7 @@ export default async function NewAgreementPage({ searchParams }: { searchParams:
   const reps = options.people.filter((p) => p.roles.includes("closer") || p.roles.includes("manager"));
   return (
     <div className="agr-page">
-      <p className="crumb"><a href="/agreements">Agreements</a> / New</p>
+      <p className="crumb"><a href="/customers">Customers</a> / New agreement</p>
       <h1>Customer agreement</h1>
       {draft.dealNumber != null && <p className="muted">Filled in from deal #{draft.dealNumber}. Check everything with the customer.</p>}
       <AgreementForm draft={draft} reps={reps} me={rep} lenders={options.lenders} today={today} />

@@ -16,7 +16,7 @@ export default async function AgreementPage({ params }: { params: { id: string }
   if (!a || !s || (s.role !== "admin" && a.repId !== s.personId)) notFound();
   return (
     <div className="agr-page">
-      <p className="crumb"><a href="/agreements">Agreements</a> / {a.number}</p>
+      <p className="crumb"><a href="/customers">Customers</a> / <a href={a.dealId ? `/customers/${a.dealId}` : `/customers/a-${a.id}`}>{customerName(a)}</a> / Agreement {a.number}</p>
       <div className="page-head">
         <h1>{customerName(a)}</h1>
         <span className={`agr-status st-${a.status}`}>{a.status === "sent" ? "Waiting for signature" : a.status === "signed" ? "Signed" : "Cancelled"}</span>
