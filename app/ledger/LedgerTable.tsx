@@ -30,6 +30,24 @@ const TODAY = todayET();
 const daysSince = (d: string | null) =>
   d == null ? null : Math.round((Date.parse(`${TODAY}T00:00:00Z`) - Date.parse(`${d}T00:00:00Z`)) / 86_400_000);
 
+/** Sales data the closer or office still owes the ledger. */
+function missingData(r: DerivedDeal): string[] {
+  const m: string[] = [];
+  if (!r.closer) m.push("closer");
+  if (!r.customerAddress?.trim()) m.push("address");
+  if (!r.leadSource?.trim()) m.push("lead source");
+  if (!r.lines.length && r.cogsOverrideCents == null) m.push("products");
+  if (r.priceCents <= 0) m.push("price");
+  if (r.financedPortionCents > 0 && !r.lender) m.push("lender");
+  if (r.splitDiffCents !== 0) m.push("cash + financed ≠ price");
+  if (!r.installedOn && !r.installScheduledOn) m.push("install date");
+  if (r.installedOn && !r.installer) m.push("installer");
+  if (r.installedOn && r.installerPayCents == null) m.push("installer pay");
+  return m;
+}
+/** The install day: when it happened, or when it was scheduled. */
+const installDay = (r: DerivedDeal) => r.installedOn ?? r.installScheduledOn;
+
 const openPayouts = (r: DerivedDeal) => sumCents(r.payoutPositions.map((p) => Math.max(0, p.openCents)));
 const sum = (pick: (r: DerivedDeal) => number) => (rows: DerivedDeal[]) => fmt(sumCents(rows.map(pick)));
 const money = (pick: (r: DerivedDeal) => number | null, totalPick?: (r: DerivedDeal) => number) => ({
@@ -93,11 +111,24 @@ const COLUMNS: Col[] = [
   { key: "done", label: "Done", field: "closed", cell: (r) => (r.closedAt ? "✓" : "") },
   { key: "note", label: "Note", field: "note", cell: (r) => r.note ?? "", cellClass: () => "wrap" },
   { key: "issues", label: "Issues", cell: (r) => r.issues.join(" · "), cellClass: () => "issues" },
+  { key: "missing", label: "Missing", cell: (r) => missingData(r).join(", "), cellClass: () => "issues" },
+  {
+    key: "sinceInstallDay",
+    label: "Days Since Install Date",
+    num: true,
+    cell: (r) => daysSince(installDay(r)) ?? "—",
+    cellClass: (r) => {
+      const d = daysSince(installDay(r));
+      return d == null ? "" : d > 60 ? "age-bad" : d > 30 ? "age-warn" : "";
+    },
+  },
 ];
 
 /** Column views. Each view starts from its preset; tweaks are remembered per view in this browser. */
 const CONSOLIDATED = ["location", "sold", "price", "cash", "financed", "fees", "collectedCustomer", "collectedLender", "outstanding", "scheduled", "installed", "profit"];
 const RECEIVABLES = ["location", "closer", "sold", "lender", "installed", "daysOut", "price", "collectedCustomer", "custOwes", "collectedLender", "lenderOwes", "outstanding"];
+const INCOMPLETE = ["location", "closer", "sold", "address", "leadSource", "products", "price", "cash", "financed", "lender", "scheduled", "installed", "installer", "installerPay", "missing"];
+const PAST_DUE = ["location", "closer", "sold", "lender", "scheduled", "installed", "sinceInstallDay", "price", "custOwes", "lenderOwes", "outstanding"];
 const only = (keep: string[]) => COLUMNS.filter((c) => !c.fixed && !keep.includes(c.key)).map((c) => c.key);
 
 interface ViewDef {
@@ -110,7 +141,7 @@ interface ViewDef {
   note?: string;
 }
 
-const VIEWS: Record<"consolidated" | "receivables" | "all", ViewDef> = {
+const VIEWS: Record<"consolidated" | "receivables" | "pastDue" | "incomplete" | "all", ViewDef> = {
   consolidated: { label: "Consolidated", collapsed: only(CONSOLIDATED), hide: true },
   receivables: {
     label: "Receivables",
@@ -121,11 +152,25 @@ const VIEWS: Record<"consolidated" | "receivables" | "all", ViewDef> = {
     sort: (a, b) => (daysSince(b.installedOn) ?? -1) - (daysSince(a.installedOn) ?? -1) || outstanding(b) - outstanding(a),
     note: "Installed jobs with money still owed, oldest first. Sold jobs not installed yet aren't receivables until the install.",
   },
+  pastDue: {
+    label: "Past Install, Unpaid",
+    collapsed: only(PAST_DUE),
+    hide: true,
+    // Install day (actual, or scheduled if it hasn't happened) is behind us and money is still owed. Oldest first.
+    filter: (r) => r.stage !== "cancelled" && outstanding(r) > 50 && installDay(r) != null && installDay(r)! < TODAY,
+    sort: (a, b) => installDay(a)!.localeCompare(installDay(b)!) || outstanding(b) - outstanding(a),
+  },
+  incomplete: {
+    label: "Incomplete Sales Data",
+    collapsed: only(INCOMPLETE),
+    hide: true,
+    filter: (r) => r.stage !== "cancelled" && missingData(r).length > 0,
+  },
   all: { label: "All Deals", collapsed: [], hide: false },
 };
 type ViewKey = keyof typeof VIEWS;
 const DEFAULT_VIEW: ViewKey = "consolidated";
-const viewStorage = (v: ViewKey) => `ledger.view.${v}.collapsed.v2`; // v2: Total Outstanding + Collected - Lender in Consolidated
+const viewStorage = (v: ViewKey) => `ledger.view.${v}.collapsed.v3`; // v3: Missing + Days Since Install Date columns; v2: Total Outstanding + Collected - Lender in Consolidated
 const NUM_W = 56;
 const STAGE_W = 104;
 const COLLAPSED_W = 28;
