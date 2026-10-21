@@ -5,7 +5,7 @@ export interface LedgerOptions {
   locations: Array<{ slug: string; name: string; active: boolean }>;
   people: Array<{ id: string; name: string; roles: string[] }>;
   lenders: string[];
-  skus: Array<{ code: string; name: string }>;
+  skus: Array<{ code: string; name: string; costCents: number }>;
 }
 
 export async function loadOptions(): Promise<LedgerOptions> {
@@ -13,7 +13,7 @@ export async function loadOptions(): Promise<LedgerOptions> {
     db().query("select slug, name, active from locations order by active desc, name"),
     db().query("select id, name, roles from people where active order by name"),
     db().query("select name from lenders where active order by name"),
-    db().query("select code, name from skus where active order by code"),
+    db().query("select code, name, coalesce(sku_cost_on(code, current_date), 0)::bigint as \"costCents\" from skus where active order by code"),
   ]);
   return {
     locations: loc.rows,
