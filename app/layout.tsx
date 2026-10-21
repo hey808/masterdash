@@ -1,3 +1,4 @@
+import { COMPANY } from "@/lib/agreement-terms";
 import { homeFor } from "@/lib/session";
 import type { Metadata } from "next";
 import "./globals.css";
@@ -21,7 +22,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body>
         <header className="topbar">
-          <a href={session ? homeFor(session.role) : "/"} className="brand" aria-label="Clear Flow Water USA, home">
+          <a href={session ? homeFor(session.role) : `https://${COMPANY.web}`} className="brand" aria-label="Clear Flow Water USA, home">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/brand/shield-white.png" alt="" width={34} height={35} className="brand-shield" />
             {/* eslint-disable-next-line @next/next/no-img-element */}

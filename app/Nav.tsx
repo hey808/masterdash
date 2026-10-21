@@ -9,11 +9,11 @@ type Item = Link | { label: string; href?: string; links: Link[] };
 
 const ADMIN_MENU: Item[] = [
   { href: "/", label: "Home" },
-  { label: "Sales", href: "/sales", links: [{ href: "/sales", label: "Dashboard" }, { href: "/appointments", label: "Appointments" }, { href: "/ledger", label: "Ledger" }, { href: "/commissions", label: "Commissions" }, { href: "/forms", label: "Forms" }] },
+  { label: "Sales", href: "/sales", links: [{ href: "/sales", label: "Dashboard" }, { href: "/appointments", label: "Appointments" }, { href: "/agreements", label: "Agreements" }, { href: "/ledger", label: "Ledger" }, { href: "/commissions", label: "Commissions" }, { href: "/forms", label: "Forms" }] },
   { label: "Operations", href: "/operations", links: [{ href: "/operations", label: "Dashboard" }, { href: "/installs", label: "Installs" }, { href: "/calendar", label: "Calendar" }, { href: "/capacity", label: "Capacity" }, { href: "/inventory", label: "Inventory" }, { href: "/activity", label: "Activity" }] },
   { label: "Finance", href: "/reports", links: [{ href: "/bank", label: "Bank" }, { href: "/reports", label: "Reports" }] },
 ];
-const SALES_MENU: Item[] = [{ href: "/appointments", label: "Appointments" }, { href: "/me", label: "My commissions" }, { href: "/forms/sale", label: "Sales form" }];
+const SALES_MENU: Item[] = [{ href: "/appointments", label: "Appointments" }, { href: "/agreements", label: "Agreements" }, { href: "/me", label: "My commissions" }, { href: "/forms/sale", label: "Sales form" }];
 const INSTALLER_MENU: Item[] = [{ href: "/installs", label: "Installs" }, { href: "/me", label: "My commissions" }, { href: "/forms/install", label: "Installer form" }];
 
 const isOn = (href: string, path: string) => (href === "/" ? path === "/" : path.startsWith(href));
@@ -50,7 +50,8 @@ export default function Nav({ role, name }: { role: "admin" | "sales" | "install
     };
   }, [open]);
 
-  if (path === "/login" || !role) return null;
+  // The customer's signing page never shows the app menu, even on a signed-in rep's phone.
+  if (path === "/login" || path.startsWith("/c/") || !role) return null;
   const MENU = role === "admin" ? ADMIN_MENU : role === "sales" ? SALES_MENU : INSTALLER_MENU;
   const userOpen = open === "__user";
   return (

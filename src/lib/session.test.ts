@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { canAccess, homeFor, legacyToken, signSession, verifySession } from "./session";
+import { canAccess, homeFor, isPublicPath, legacyToken, signSession, verifySession } from "./session";
 
 describe("sessions", () => {
   beforeAll(() => {
@@ -40,5 +40,11 @@ describe("sessions", () => {
     expect(homeFor("sales")).toBe("/appointments");
     expect(homeFor("admin")).toBe("/");
     expect(homeFor("installer")).toBe("/installs");
+    expect(isPublicPath("/c/abc123")).toBe(true);
+    expect(isPublicPath("/api/c/abc123")).toBe(true);
+    expect(isPublicPath("/calendar")).toBe(false);
+    expect(isPublicPath("/capacity")).toBe(false);
+    expect(canAccess("sales", "/agreements/new")).toBe(true);
+    expect(canAccess("installer", "/agreements")).toBe(false);
   });
 });

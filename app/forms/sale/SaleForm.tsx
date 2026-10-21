@@ -45,7 +45,7 @@ export default function SaleForm({ options, stock, today, me, appointments = [],
   const [lender, setLender] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ number: number; customer: string } | null>(null);
+  const [done, setDone] = useState<{ id: string; number: number; customer: string } | null>(null);
 
   const priceCents = parseMoneyInput(price);
   const financedCents = parseMoneyInput(financed) ?? 0;
@@ -91,9 +91,9 @@ export default function SaleForm({ options, stock, today, me, appointments = [],
           note: f.get("note") || undefined,
         }),
       });
-      const b = (await res.json().catch(() => ({}))) as { number?: number; error?: string };
+      const b = (await res.json().catch(() => ({}))) as { id?: string; number?: number; error?: string };
       if (!res.ok) return setError(b.error ?? "Couldn't save the sale.");
-      setDone({ number: b.number!, customer: String(f.get("customerName")) });
+      setDone({ id: b.id!, number: b.number!, customer: String(f.get("customerName")) });
       window.scrollTo({ top: 0 });
     } catch {
       setError("Couldn't reach the server. Check your connection and try again.");
@@ -107,9 +107,10 @@ export default function SaleForm({ options, stock, today, me, appointments = [],
       <div className="form-done">
         <h2>Deal #{done.number} saved</h2>
         <p>{done.customer} is in the ledger and the products are set aside from {openLocations.find((l) => l.slug === location)?.name} stock.</p>
+        <p><strong>Next: the customer agreement.</strong> It fills in from this sale; you add the water test and options, then they sign.</p>
         <div className="row-actions">
-          <a className="btn-primary big" href="/forms/sale">Enter another sale</a>
-          {me ? <a className="linkbtn" href="/me">My commissions</a> : <a className="linkbtn" href="/ledger">Open the ledger</a>}
+          <a className="btn-primary big" href={`/agreements/new?deal=${done.id}`}>Create customer agreement</a>
+          {me ? <a className="linkbtn" href="/appointments">Back to my appointments</a> : <a className="linkbtn" href="/forms/sale">Enter another sale</a>}
         </div>
       </div>
     );

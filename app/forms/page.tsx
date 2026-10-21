@@ -9,6 +9,10 @@ export default function FormsPage() {
           <span className="form-card-kicker">Closer</span>
           <span className="form-card-title">Sales form</span>
         </a>
+        <a className="form-card" href="/agreements/new">
+          <span className="form-card-kicker">Closer</span>
+          <span className="form-card-title">Customer agreement</span>
+        </a>
         <a className="form-card" href="/forms/install">
           <span className="form-card-kicker">Installer</span>
           <span className="form-card-title">Installer form</span>

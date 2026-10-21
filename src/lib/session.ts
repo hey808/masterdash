@@ -92,12 +92,13 @@ export async function verifySession(cookie: string | undefined | null): Promise<
 
 /** Pages and APIs each role may use. Admin may use everything. */
 const ALLOWED: Record<Exclude<Role, "admin">, RegExp[]> = {
-  sales: [/^\/appointments(\/|$)/, /^\/api\/appointments$/, /^\/me(\/|$)/, /^\/forms\/sale(\/|$)/, /^\/api\/forms\/sale$/],
+  sales: [/^\/appointments(\/|$)/, /^\/api\/appointments$/, /^\/agreements(\/|$)/, /^\/api\/agreements(\/|$)/, /^\/me(\/|$)/, /^\/forms\/sale(\/|$)/, /^\/api\/forms\/sale$/],
   installer: [/^\/installs(\/|$)/, /^\/api\/appointments$/, /^\/me(\/|$)/, /^\/forms\/install(\/|$)/, /^\/api\/forms\/install$/],
 };
 
 /** Paths anyone can reach, signed in or not. */
-export const isPublicPath = (p: string) => p === "/login" || p === "/api/login" || p === "/api/logout";
+/** Customers open their agreement by its secret link: /c/<token>, /c/<token>/pdf and /api/c/<token>. */
+export const isPublicPath = (p: string) => p === "/login" || p === "/api/login" || p === "/api/logout" || p.startsWith("/c/") || p.startsWith("/api/c/");
 
 export function canAccess(role: Role, pathname: string): boolean {
   if (role === "admin") return true;
