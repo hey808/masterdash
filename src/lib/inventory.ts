@@ -81,7 +81,8 @@ export async function loadStock(locationSlug: string | null, today = todayET()):
       onOrder,
       usedLast28: Number(r.used28),
       weeklyUse,
-      weeksOfCover: weeklyUse > 0 ? available / weeklyUse : null,
+      // Nothing available = no cover (not negative weeks); the Short status says the rest.
+      weeksOfCover: weeklyUse > 0 ? Math.max(0, available) / weeklyUse : null,
       status: stockStatus(available, onOrder, weeklyUse),
       valueCents: Math.max(0, onHand) * Number(r.cost),
     };

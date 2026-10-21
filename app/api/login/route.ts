@@ -4,14 +4,14 @@ import { SESSION_COOKIE, SESSION_MAX_AGE, safeEqual, sessionToken } from "@/lib/
 export async function POST(req: NextRequest) {
   const form = await req.formData();
   const given = String(form.get("password") ?? "");
-  const rawNext = String(form.get("next") ?? "/ledger");
-  const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/ledger";
+  const rawNext = String(form.get("next") ?? "/");
+  const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
   const password = process.env.APP_PASSWORD;
 
   if (!password || !safeEqual(await sessionToken(given), await sessionToken(password))) {
     const back = new URL("/login", req.url);
     back.searchParams.set("error", password ? "wrong" : "unset");
-    if (next !== "/ledger") back.searchParams.set("next", next);
+    if (next !== "/") back.searchParams.set("next", next);
     return NextResponse.redirect(back, 303);
   }
 

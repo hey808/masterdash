@@ -20,4 +20,5 @@ export async function middleware(req: NextRequest) {
   return NextResponse.redirect(url);
 }
 
-export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"] };
+// Logo files and app icons are public so the sign-in page can show them.
+export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico|brand/|icon|apple-icon).*)"] };

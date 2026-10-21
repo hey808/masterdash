@@ -5,9 +5,11 @@ export default function LoginPage({ searchParams }: { searchParams: { next?: str
     searchParams.error === "wrong" ? "That password didn't work." : searchParams.error === "unset" ? "APP_PASSWORD isn't set on the server." : null;
   return (
     <section className="login">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/brand/shield.png" alt="" width={72} height={73} className="login-shield" />
       <h1>Sign in</h1>
       <form method="post" action="/api/login">
-        <input type="hidden" name="next" value={searchParams.next ?? "/ledger"} />
+        <input type="hidden" name="next" value={searchParams.next ?? "/"} />
         <label htmlFor="password">Password</label>
         <input id="password" name="password" type="password" autoComplete="current-password" autoFocus required />
         {error && <p className="error">{error}</p>}
