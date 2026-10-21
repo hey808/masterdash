@@ -213,7 +213,11 @@ type SaveResult = string | null; // error message, or null on success
 type NumSort = "asc" | "desc" | null;
 const sortStorage = (v: string) => `ledger.view.${v}.numSort`;
 
-export default function LedgerTable({ rows: initial, options }: { rows: DerivedDeal[]; options: LedgerOptions }) {
+export default function LedgerTable({ rows: initial, options, locations }: {
+  rows: DerivedDeal[];
+  options: LedgerOptions;
+  locations: Array<{ slug: string; label: string; href: string; on: boolean }>;
+}) {
   const [rows, setRows] = useState(initial);
   const [view, setView] = useState<ViewKey>(DEFAULT_VIEW);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set(VIEWS[DEFAULT_VIEW].collapsed));
@@ -352,11 +356,16 @@ export default function LedgerTable({ rows: initial, options }: { rows: DerivedD
   return (
     <>
       <div className="table-bar">
-        <nav className="filters views" aria-label="Column view">
+        <nav className="segmented" aria-label="View">
           {(Object.keys(VIEWS) as ViewKey[]).map((v) => (
             <button key={v} type="button" className={v === view ? "on" : ""} aria-pressed={v === view} onClick={() => loadView(v)}>
               {VIEWS[v].label}
             </button>
+          ))}
+        </nav>
+        <nav className="filters loc-pills" aria-label="Location">
+          {locations.map((l) => (
+            <a key={l.slug || "all"} href={l.href} className={l.on ? "on" : ""} aria-current={l.on ? "page" : undefined}>{l.label}</a>
           ))}
         </nav>
         {customized && (

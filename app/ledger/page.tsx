@@ -35,13 +35,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: { loc
   return (
     <>
       <h1>Deal Ledger</h1>
-      <nav className="filters">
-        {LOCATIONS.map(([k, label]) => (
-          <a key={k || "all"} href={href(k)} className={k === loc ? "on" : ""}>{label}</a>
-        ))}
-      </nav>
-
-      <LedgerTable rows={rows} options={options} />
+      <LedgerTable rows={rows} options={options} locations={LOCATIONS.map(([slug, label]) => ({ slug, label, href: href(slug), on: slug === loc }))} />
     </>
   );
 }
