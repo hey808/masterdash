@@ -30,6 +30,8 @@ export interface Payout {
   personId: string | null;
   amountCents: Cents;
   paidOn: string | null;
+  /** The Friday pay run it was paid in; null = go by paidOn. */
+  payRun?: string | null;
 }
 
 /** A deal as stored: typed facts plus stamped rates. Nothing derived. */

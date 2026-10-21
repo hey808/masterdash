@@ -22,7 +22,7 @@ select d.*,
                                                 'feeCents', x.fee_cents, 'receivedOn', x.received_on) order by x.received_on nulls first)
             from payments x where x.deal_id = d.id), '[]') as payments,
   coalesce((select jsonb_agg(jsonb_build_object('id', x.id, 'kind', x.kind, 'personId', x.person_id, 'amountCents', x.amount_cents,
-                                                'paidOn', x.paid_on) order by x.paid_on nulls first)
+                                                'paidOn', x.paid_on, 'payRun', x.pay_run) order by x.paid_on nulls first)
             from payouts x where x.deal_id = d.id), '[]') as payouts
 from deals d
 join locations l on l.id = d.location_id

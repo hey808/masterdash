@@ -153,17 +153,23 @@ export async function submitInstall(input: unknown): Promise<{ id: string; numbe
 /* ── Payout form ─────────────────────────────────────────────────────── */
 
 const PAYOUT_KINDS = ["closer", "override", "setter", "canvasser", "installer"] as const;
+const isFriday = (d: string) => new Date(`${d}T12:00:00Z`).getUTCDay() === 5;
 
-export const PayoutForm = z.object({
+const PayeeBatch = z.object({
   personId: uuid,
-  paidOn: date,
   method: z.enum(["check", "zelle", "cashapp", "venmo", "ach", "cash", "other"]),
   reference: optText, // check number, confirmation id
   note: optText,
   lines: z
     .array(z.object({ dealId: uuid, kind: z.enum(PAYOUT_KINDS), amountCents: cents.refine((n) => n > 0, "Each line needs an amount") }))
-    .min(1, "Pick at least one deal to pay")
-    .max(200),
+    .min(1, "Pick at least one deal for each person you're paying")
+    .max(300),
+});
+
+export const PayoutForm = z.object({
+  payRun: date.refine(isFriday, "Pay runs are on Fridays"),
+  paidOn: date,
+  payees: z.array(PayeeBatch).min(1, "Pick at least one person to pay").max(50),
 });
 
 /** Who a payout kind belongs to on a deal. */
@@ -175,43 +181,62 @@ const KIND_PERSON_COL: Record<(typeof PAYOUT_KINDS)[number], string> = {
   installer: "installer_id",
 };
 
+export interface PayoutResult {
+  people: number;
+  lines: number;
+  totalCents: number;
+}
+
 /**
- * One payment to one person, split across their deals. Each line becomes a payout row
- * dated paidOn; the method and reference go on every row so the bank line can be matched.
+ * A whole pay run in one go: one payment per person (method, check # / reference),
+ * each split across that person's deals. Every line becomes a payout row tagged with the
+ * pay run, so it shows on that Friday's run on the Commissions tab. All or nothing.
  */
-export async function submitPayout(input: unknown): Promise<{ count: number; totalCents: number }> {
+export async function submitPayouts(input: unknown): Promise<PayoutResult> {
   const p = PayoutForm.safeParse(input);
   if (!p.success) throw new EditError(first(p.error), 400);
   const v = p.data;
   const seen = new Set<string>();
-  for (const l of v.lines) {
-    const k = `${l.dealId}:${l.kind}`;
-    if (seen.has(k)) throw new EditError("The same deal is on the payout twice.", 400);
-    seen.add(k);
+  for (const b of v.payees) {
+    if (seen.has(b.personId)) throw new EditError("The same person is on the payout twice.", 400);
+    seen.add(b.personId);
+    const ls = new Set<string>();
+    for (const l of b.lines) {
+      const k = `${l.dealId}:${l.kind}`;
+      if (ls.has(k)) throw new EditError("The same deal is on someone's payout twice.", 400);
+      ls.add(k);
+    }
   }
   return tx("form:payout", async (c) => {
-    const person = await c.query("select name from people where id = $1", [v.personId]);
-    if (!person.rowCount) throw new EditError("Pick who's being paid.", 400);
-    const ref = [v.method === "check" && v.reference ? `Check #${v.reference.replace(/^#/, "")}` : v.reference, v.note].filter(Boolean).join(" · ") || null;
     let total = 0;
-    for (const l of v.lines) {
-      const d = await c.query(`select number, cancelled_at, ${KIND_PERSON_COL[l.kind]} as person_id from deals where id = $1 for update`, [l.dealId]);
-      const row = d.rows[0];
-      if (!row) throw new EditError("One of those deals no longer exists. Reload and try again.", 404);
-      if (row.cancelled_at) throw new EditError(`Deal #${row.number} is cancelled; nothing is owed on it.`, 400);
-      if (row.person_id !== v.personId) throw new EditError(`${person.rows[0].name} isn't the ${l.kind} on deal #${row.number}.`, 400);
-      await c.query(
-        "insert into payouts (deal_id, person_id, kind, amount_cents, paid_on, method, note) values ($1,$2,$3,$4,$5,$6,$7)",
-        [l.dealId, v.personId, l.kind, l.amountCents, v.paidOn, v.method, ref],
-      );
-      await c.query("update deals set updated_at = now() where id = $1", [l.dealId]);
-      total += l.amountCents;
+    let lineCount = 0;
+    for (const b of v.payees) {
+      const person = await c.query("select name from people where id = $1", [b.personId]);
+      if (!person.rowCount) throw new EditError("Someone on the payout no longer exists. Reload and try again.", 400);
+      const name: string = person.rows[0].name;
+      const ref = [b.method === "check" && b.reference ? `Check #${b.reference.replace(/^#/, "")}` : b.reference, b.note].filter(Boolean).join(" · ") || null;
+      let personTotal = 0;
+      for (const l of b.lines) {
+        const d = await c.query(`select number, cancelled_at, ${KIND_PERSON_COL[l.kind]} as person_id from deals where id = $1 for update`, [l.dealId]);
+        const row = d.rows[0];
+        if (!row) throw new EditError("One of those deals no longer exists. Reload and try again.", 404);
+        if (row.cancelled_at) throw new EditError(`Deal #${row.number} is cancelled; nothing is owed on it.`, 400);
+        if (row.person_id !== b.personId) throw new EditError(`${name} isn't the ${l.kind} on deal #${row.number}.`, 400);
+        await c.query(
+          "insert into payouts (deal_id, person_id, kind, amount_cents, paid_on, method, note, pay_run) values ($1,$2,$3,$4,$5,$6,$7,$8)",
+          [l.dealId, b.personId, l.kind, l.amountCents, v.paidOn, b.method, ref, v.payRun],
+        );
+        await c.query("update deals set updated_at = now() where id = $1", [l.dealId]);
+        personTotal += l.amountCents;
+      }
+      await c.query("insert into form_submissions (kind, deal_id, submitted_by, payload) values ('payout', $1, $2, $3)", [
+        b.lines.length === 1 ? b.lines[0]!.dealId : null,
+        b.personId,
+        { payRun: v.payRun, paidOn: v.paidOn, ...b, totalCents: personTotal },
+      ]);
+      total += personTotal;
+      lineCount += b.lines.length;
     }
-    await c.query("insert into form_submissions (kind, deal_id, submitted_by, payload) values ('payout', $1, $2, $3)", [
-      v.lines.length === 1 ? v.lines[0]!.dealId : null,
-      v.personId,
-      { ...v, totalCents: total },
-    ]);
-    return { count: v.lines.length, totalCents: total };
+    return { people: v.payees.length, lines: lineCount, totalCents: total };
   });
 }

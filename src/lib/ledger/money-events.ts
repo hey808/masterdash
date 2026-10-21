@@ -21,6 +21,8 @@ export const NewPayout = z.object({
   amountCents: z.number().int().positive("Amount must be more than $0").max(10_000_000),
   paidOn: date,
   method: z.string().max(40).nullable().optional(),
+  /** The Friday pay run this pays; omitted = go by paidOn. */
+  payRun: date.nullable().optional(),
 });
 
 export const NewPayment = z.object({
@@ -49,8 +51,8 @@ export async function recordPayout(input: unknown, actor: string): Promise<{ id:
     if (!deal.rowCount) throw new EditError("That deal no longer exists.", 404);
     if (deal.rows[0].cancelled_at) throw new EditError("That deal is cancelled; nothing is owed on it.", 400);
     const { rows } = await c.query(
-      "insert into payouts (deal_id, person_id, kind, amount_cents, paid_on, method) values ($1,$2,$3,$4,$5,$6) returning id",
-      [v.dealId, v.personId, v.kind, v.amountCents, v.paidOn, v.method ?? null],
+      "insert into payouts (deal_id, person_id, kind, amount_cents, paid_on, method, pay_run) values ($1,$2,$3,$4,$5,$6,$7) returning id",
+      [v.dealId, v.personId, v.kind, v.amountCents, v.paidOn, v.method ?? null, v.payRun ?? null],
     );
     return { id: rows[0].id as string };
   });

@@ -12,7 +12,7 @@
  */
 import { sumCents, type Cents } from "../money";
 import { SETTLED_CENTS, derive } from "./derive";
-import type { Deal, DerivedDeal, Payment, PayoutKind } from "./types";
+import type { Deal, DerivedDeal, Payment, Payout, PayoutKind } from "./types";
 
 /* ── Dates ───────────────────────────────────────────────────────────── */
 
@@ -39,6 +39,12 @@ export function payWeek(payDate: string): PayWeek {
 }
 
 const within = (d: string | null, from: string, to: string) => d != null && d >= from && d <= to;
+
+/** The Friday on or before a day. */
+const fridayOnOrBefore = (d: string) => addDays(d, -((weekday(d) - 5 + 7) % 7));
+
+/** The pay run a payout belongs to: the one it was recorded against, else the Friday on or before it was paid. Undated = before every run. */
+export const runOf = (p: Pick<Payout, "paidOn" | "payRun">): string | null => p.payRun ?? (p.paidOn ? fridayOnOrBefore(p.paidOn) : null);
 
 /* ── The run ─────────────────────────────────────────────────────────── */
 
@@ -108,7 +114,7 @@ function asOf(d: Deal, cutoff: string, payoutsBefore: string): Deal {
   return {
     ...d,
     payments: d.payments.filter((p) => p.receivedOn == null || p.receivedOn <= cutoff),
-    payouts: d.payouts.filter((p) => p.paidOn == null || p.paidOn < payoutsBefore),
+    payouts: d.payouts.filter((p) => { const r = runOf(p); return r == null || r < payoutsBefore; }),
     installedOn: d.installedOn && d.installedOn <= cutoff ? d.installedOn : null,
     closedAt: null, // sign-off doesn't change what's owed
   };
@@ -152,7 +158,7 @@ export function buildPayRun(deals: Deal[], payDate: string): PayRun {
       const prevPos = before.payoutPositions.find((x) => x.kind === pos.kind);
       const isNew = !prevPos || !prevPos.payable;
       if (!isNew) continue; // no carryovers: only what became payable this week
-      const runPayouts = d.payouts.filter((p) => p.kind === pos.kind && within(p.paidOn, week.payDate, week.runEnd));
+      const runPayouts = d.payouts.filter((p) => p.kind === pos.kind && runOf(p) === week.payDate);
       const paidThisRun = sumCents(runPayouts.map((p) => p.amountCents));
       const lastIn = inWeek.at(-1);
       lines.push({
@@ -178,7 +184,7 @@ export function buildPayRun(deals: Deal[], payDate: string): PayRun {
     // Lines that were due before this run and got paid in it still belong on the sheet.
     for (const k of KINDS) {
       if (lines.some((l) => l.dealId === d.id && l.kind === k)) continue;
-      const runPayouts = d.payouts.filter((p) => p.kind === k && within(p.paidOn, week.payDate, week.runEnd));
+      const runPayouts = d.payouts.filter((p) => p.kind === k && runOf(p) === week.payDate);
       if (!runPayouts.length) continue;
       const pos = now.payoutPositions.find((x) => x.kind === k);
       const paid = sumCents(runPayouts.map((p) => p.amountCents));

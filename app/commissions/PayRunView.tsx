@@ -55,7 +55,7 @@ export default function PayRunView({ run, today, currentPayDate }: { run: PayRun
         const res = await fetch("/api/payouts", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dealId: l.dealId, kind: l.kind, personId: l.personId, amountCents: l.remainingCents, paidOn }),
+          body: JSON.stringify({ dealId: l.dealId, kind: l.kind, personId: l.personId, amountCents: l.remainingCents, paidOn, payRun: week.payDate }),
         });
         if (!res.ok) {
           const b = (await res.json().catch(() => ({}))) as { error?: string };

@@ -110,25 +110,36 @@ describe.skipIf(!url)("payout form (database)", () => {
   afterAll(closeDb);
 
   it("records one payment split across deals, and refuses the wrong person", async () => {
-    const { submitPayout } = await import("./forms");
+    const { submitPayouts } = await import("./forms");
     const { rows } = await db().query(
       `select d.id, d.closer_id, d.installer_id from deals d where d.cancelled_at is null and d.closer_id is not null and d.installer_id is not null
          and d.closer_id <> d.installer_id order by d.number limit 2`,
     );
     const [a, b] = rows as Array<{ id: string; closer_id: string; installer_id: string }>;
     const before = (await loadDeal(a!.id))!.payouts.length;
-    const res = await submitPayout({
-      personId: a!.closer_id, paidOn: "2026-10-20", method: "check", reference: "1206",
-      lines: [{ dealId: a!.id, kind: "closer", amountCents: 12345 }],
+    const res = await submitPayouts({
+      payRun: "2026-10-23", paidOn: "2026-10-20",
+      payees: [{ personId: a!.closer_id, method: "check", reference: "1206", lines: [{ dealId: a!.id, kind: "closer", amountCents: 12345 }] }],
     });
-    expect(res).toEqual({ count: 1, totalCents: 12345 });
+    expect(res).toEqual({ people: 1, lines: 1, totalCents: 12345 });
     const d = (await loadDeal(a!.id))!;
     expect(d.payouts.length).toBe(before + 1);
-    const row = await db().query("select method, note, paid_on from payouts where deal_id = $1 and amount_cents = 12345 order by created_at desc limit 1", [a!.id]);
-    expect(row.rows[0]).toMatchObject({ method: "check", note: "Check #1206", paid_on: "2026-10-20" });
+    const row = await db().query("select method, note, paid_on, pay_run from payouts where deal_id = $1 and amount_cents = 12345 order by created_at desc limit 1", [a!.id]);
+    expect(row.rows[0]).toMatchObject({ method: "check", note: "Check #1206", paid_on: "2026-10-20", pay_run: "2026-10-23" });
+    // All or nothing: a bad second person rolls back the first.
+    const count = async () => Number((await db().query("select count(*) n from payouts")).rows[0].n);
+    const n0 = await count();
     await expect(
-      submitPayout({ personId: b!.installer_id, paidOn: "2026-10-20", method: "zelle", lines: [{ dealId: b!.id, kind: "closer", amountCents: 100 }] }),
+      submitPayouts({
+        payRun: "2026-10-23", paidOn: "2026-10-20",
+        payees: [
+          { personId: a!.closer_id, method: "zelle", lines: [{ dealId: a!.id, kind: "closer", amountCents: 100 }] },
+          { personId: b!.installer_id, method: "zelle", lines: [{ dealId: b!.id, kind: "closer", amountCents: 100 }] },
+        ],
+      }),
     ).rejects.toThrow(/isn't the closer/);
+    expect(await count()).toBe(n0);
+    await expect(submitPayouts({ payRun: "2026-10-22", paidOn: "2026-10-20", payees: [{ personId: a!.closer_id, method: "zelle", lines: [{ dealId: a!.id, kind: "closer", amountCents: 1 }] }] })).rejects.toThrow(/Fridays/);
     const sub = await db().query("select kind, payload->>'totalCents' t from form_submissions where kind = 'payout' order by created_at desc limit 1");
     expect(sub.rows[0]).toEqual({ kind: "payout", t: "12345" });
   });

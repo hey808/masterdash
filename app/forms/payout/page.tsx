@@ -1,4 +1,5 @@
-import { todayET } from "@/lib/dates";
+import { shortDate, todayET } from "@/lib/dates";
+import { addDays, payDateFor } from "@/lib/ledger/payrun";
 import { loadLedger } from "@/lib/ledger/repo";
 import { KIND_LABEL } from "@/lib/ledger/payouts";
 import PayoutForm, { type OpenLine, type Payee } from "./PayoutForm";
@@ -37,11 +38,18 @@ export default async function PayoutFormPage() {
     .map((p) => ({ ...p, lines: p.lines.sort((a, b) => Number(b.payable) - Number(a.payable) || a.number - b.number) }))
     .sort((a, b) => b.payableCents - a.payableCents || a.name.localeCompare(b.name));
 
+  // This Friday's run by default; last Friday's and next Friday's are there for late or early payouts.
+  const thisRun = payDateFor(today);
+  const runs = [-14, -7, 0, 7].map((n) => {
+    const date = addDays(thisRun, n);
+    return { date, label: `Fri ${shortDate(date)}${n === 0 ? " (this Friday)" : n === -7 ? " (last Friday)" : ""}` };
+  });
+
   return (
     <>
       <p className="crumb"><a href="/forms">Forms</a> / Payout form</p>
       <h1>Payout form</h1>
-      <PayoutForm payees={payees} today={today} />
+      <PayoutForm payees={payees} runs={runs} defaultRun={thisRun} today={today} />
     </>
   );
 }

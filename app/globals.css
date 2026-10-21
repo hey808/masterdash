@@ -400,3 +400,19 @@ table.payout-lines tr.waiting td { color: var(--muted); }
 table.payout-lines tr.on td { background: #f4f9ff; }
 table.payout-lines input.amt { width: 110px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 5px; font: inherit; text-align: right; }
 .act-kind.k-payout { background: #f3f0fb; color: #4b2a9a; }
+
+/* Bulk payouts */
+.payees { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 90px; max-width: 1100px; }
+.payee { border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.payee.on { border-color: #b9d6fb; box-shadow: inset 4px 0 0 var(--blue); }
+.payee-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 10px 14px; }
+.payee-head label.check { min-width: 170px; }
+.payee-head select, .payee-head input.ref { padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; font: 13px var(--font-body); }
+.payee-head input.ref { width: 130px; }
+.payee-spacer { flex: 1; }
+.payee-total { min-width: 110px; text-align: right; font: 700 15px var(--font-display); color: var(--navy); font-variant-numeric: tabular-nums; }
+.payee-body { padding: 0 14px 12px; border-top: 1px solid var(--line); }
+.pill.warn-pill { padding: 1px 8px; border-radius: 999px; background: #fff1d6; color: #8a5a00; font-size: 12px; font-weight: 600; }
+.payout-bar { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; gap: 18px; max-width: 1100px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 10px; background: #fff; box-shadow: 0 -6px 20px rgba(5, 44, 111, .08); }
+.payout-bar-total { margin-left: auto; font: 800 20px var(--font-display); color: var(--navy); font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .payee-head label.check { min-width: 0; } .payee-spacer { display: none; } }

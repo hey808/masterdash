@@ -72,6 +72,19 @@ describe("pay run", () => {
     expect(closer.payoutIds).toEqual(["x"]);
   });
 
+  it("a payout paid early (Tuesday) but tagged for Friday's run counts in Friday's run, not last week's", () => {
+    const d = deal({ payments: [pay("2026-10-20")], payouts: [{ id: "y", kind: "closer", personId: "b", amountCents: 108675, paidOn: "2026-10-20", payRun: "2026-10-23" }] });
+    const closer = buildPayRun([d], "2026-10-23").lines.find((l) => l.kind === "closer")!;
+    expect(closer.paidThisRunCents).toBe(108675);
+    expect(closer.remainingCents).toBe(0);
+    expect(buildPayRun([d], "2026-10-16").lines.find((l) => l.kind === "closer")).toBeUndefined();
+  });
+
+  it("an untagged payout goes by date: the Friday on or before it", () => {
+    const d = deal({ payments: [pay("2026-10-13")], payouts: [{ id: "z", kind: "closer", personId: "b", amountCents: 108675, paidOn: "2026-10-20" }] });
+    expect(buildPayRun([d], "2026-10-16").lines.find((l) => l.kind === "closer")!.paidThisRunCents).toBe(108675);
+  });
+
   it("installer pay also waits for the money", () => {
     const run = buildPayRun([deal({ installedOn: "2026-10-19" })], "2026-10-23");
     expect(run.lines.find((l) => l.kind === "installer")).toBeUndefined();
