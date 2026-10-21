@@ -14,6 +14,12 @@ export async function middleware(req: NextRequest) {
   const cookie = req.cookies.get(SESSION_COOKIE)?.value;
   if (password && cookie && safeEqual(cookie, await sessionToken(password))) return NextResponse.next();
 
+  // API calls get a real error, not a redirect: fetch would follow it to the
+  // sign-in page and the screen would treat that 200 as a successful save.
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.json({ error: "You've been signed out. Reload the page and sign in again." }, { status: 401 });
+  }
+
   const url = req.nextUrl.clone();
   url.pathname = "/login";
   url.search = pathname === "/" ? "" : `?next=${encodeURIComponent(pathname + req.nextUrl.search)}`;

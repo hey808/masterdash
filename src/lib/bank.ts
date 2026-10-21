@@ -275,16 +275,24 @@ export async function accountBalances(onOrBefore: string): Promise<AccountBalanc
   )).rows);
 }
 
-/** Bank balance at the start of `day`: end-of-day balance of the first posted day ≥ day, minus that day's movement. */
+/**
+ * Bank balance at the start of `day`: the end-of-day balance of the last posted day before it.
+ * With no statement lines before `day` (the account's first month), work back from the first
+ * posted day on or after it: that day's balance minus that day's movement. Null = no data either side.
+ */
 export async function openingBalance(accountId: string, day: string): Promise<number | null> {
   const { rows } = await db().query(
-    `with d as (select min(posted_on) as on_day from bank_transactions where account_id = $1 and posted_on >= $2)
-     select (select balance_cents from bank_transactions where account_id = $1 and posted_on = d.on_day and balance_cents is not null limit 1)
-          - (select coalesce(sum(amount_cents), 0) from bank_transactions where account_id = $1 and posted_on = d.on_day) as opening
-     from d`,
+    `with before as (select max(posted_on) as d from bank_transactions where account_id = $1 and posted_on < $2),
+          after as (select min(posted_on) as d from bank_transactions where account_id = $1 and posted_on >= $2)
+     select
+       (select t.balance_cents from bank_transactions t, before where t.account_id = $1 and t.posted_on = before.d and t.balance_cents is not null limit 1) as prior,
+       (select t.balance_cents from bank_transactions t, after where t.account_id = $1 and t.posted_on = after.d and t.balance_cents is not null limit 1)
+         - (select coalesce(sum(t.amount_cents), 0) from bank_transactions t, after where t.account_id = $1 and t.posted_on = after.d) as worked_back`,
     [accountId, day],
   );
-  return rows[0]?.opening == null ? null : Number(rows[0].opening);
+  const r = rows[0];
+  if (r?.prior != null) return Number(r.prior);
+  return r?.worked_back == null ? null : Number(r.worked_back);
 }
 
 /* ── Editing ─────────────────────────────────────────────────────────── */

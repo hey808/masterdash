@@ -77,8 +77,10 @@ export interface Collection {
   customer: string;
   location: string;
   payment: Payment;
-  /** True once this payment completed the deal's money (commissions unlocked). */
+  /** True once this payment completed the deal's money. */
   completesDeal: boolean;
+  /** Paid in full AND installed by the cutoff, so commissions are payable. */
+  unlocksCommissions: boolean;
 }
 
 export interface WaitingLine {
@@ -146,6 +148,7 @@ export function buildPayRun(deals: Deal[], payDate: string): PayRun {
       collections.push({
         dealId: d.id, dealNumber: d.number, customer: d.customerName, location: d.location, payment: p,
         completesDeal: settled(upTo) && !settled(dayBefore),
+        unlocksCommissions: settled(upTo) && !settled(dayBefore) && !!d.installedOn && d.installedOn <= week.cutoff,
       });
     }
 

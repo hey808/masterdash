@@ -13,8 +13,12 @@
 import { z } from "zod";
 import { tx } from "./db";
 import { EditError } from "./ledger/edit";
+import { assertPayoutFits } from "./ledger/money-events";
 
-const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date");
+const date = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date")
+  .refine((d) => d >= "2000-01-01" && d <= "2099-12-31" && !Number.isNaN(Date.parse(`${d}T00:00:00Z`)), "That date doesn't look right");
 const uuid = z.string().uuid();
 const cents = z.number().int().min(0).max(100_000_000_00);
 const method = z.enum(["cash", "check", "card", "ach", "zelle", "other"]);
@@ -217,11 +221,11 @@ export async function submitPayouts(input: unknown): Promise<PayoutResult> {
       const ref = [b.method === "check" && b.reference ? `Check #${b.reference.replace(/^#/, "")}` : b.reference, b.note].filter(Boolean).join(" · ") || null;
       let personTotal = 0;
       for (const l of b.lines) {
-        const d = await c.query(`select number, cancelled_at, ${KIND_PERSON_COL[l.kind]} as person_id from deals where id = $1 for update`, [l.dealId]);
+        const d = await c.query(`select number, ${KIND_PERSON_COL[l.kind]} as person_id from deals where id = $1`, [l.dealId]);
         const row = d.rows[0];
-        if (!row) throw new EditError("One of those deals no longer exists. Reload and try again.", 404);
-        if (row.cancelled_at) throw new EditError(`Deal #${row.number} is cancelled; nothing is owed on it.`, 400);
-        if (row.person_id !== b.personId) throw new EditError(`${name} isn't the ${l.kind} on deal #${row.number}.`, 400);
+        if (row && row.person_id !== b.personId) throw new EditError(`${name} isn't the ${l.kind} on deal #${row.number}.`, 400);
+        // Locks the deal; rejects cancelled deals and anything over what's still owed.
+        await assertPayoutFits(c, { dealId: l.dealId, kind: l.kind, personId: b.personId, amountCents: l.amountCents });
         await c.query(
           "insert into payouts (deal_id, person_id, kind, amount_cents, paid_on, method, note, pay_run) values ($1,$2,$3,$4,$5,$6,$7,$8)",
           [l.dealId, b.personId, l.kind, l.amountCents, v.paidOn, b.method, ref, v.payRun],

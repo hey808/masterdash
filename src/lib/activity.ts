@@ -82,7 +82,7 @@ select * from (
   union all select * from adjustments
 ) x
 where ($1::text[] is null or kind = any($1))
-  and ($2::text is null or location = (select name from locations where slug = $2))
+  and ($2::text is null or location = (select name from locations where slug = $2) or (kind = 'payout' and location is null))
 order by at desc
 limit $3`;
 

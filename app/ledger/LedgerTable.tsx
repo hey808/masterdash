@@ -28,9 +28,10 @@ type Col = {
 
 /** Total still owed by the customer and the lender (over-funding counts as 0). */
 const outstanding = (r: DerivedDeal) => Math.max(0, r.cashDueCents) + Math.max(0, r.fundingDueCents);
-const TODAY = todayET();
+/** Today in Eastern time, read fresh so a tab left open past midnight stays right. */
+const today = () => todayET();
 const daysSince = (d: string | null) =>
-  d == null ? null : Math.round((Date.parse(`${TODAY}T00:00:00Z`) - Date.parse(`${d}T00:00:00Z`)) / 86_400_000);
+  d == null ? null : Math.round((Date.parse(`${today()}T00:00:00Z`) - Date.parse(`${d}T00:00:00Z`)) / 86_400_000);
 
 const openPayouts = (r: DerivedDeal) => sumCents(r.payoutPositions.map((p) => Math.max(0, p.openCents)));
 const sum = (pick: (r: DerivedDeal) => number) => (rows: DerivedDeal[]) => fmt(sumCents(rows.map(pick)));
@@ -206,7 +207,7 @@ export default function LedgerTable({ rows: initial, options, locations }: {
       /* ignore */
     }
   }, [frame, customFrom, customTo]);
-  const [frameFrom, frameTo] = frameRange(frame, TODAY, customFrom, customTo);
+  const [frameFrom, frameTo] = frameRange(frame, today(), customFrom, customTo);
   const [stageFor, setStageFor] = useState<string | null>(null);
   const closeStage = useCallback(() => setStageFor(null), []);
   const [paymentsFor, setPaymentsFor] = useState<{ id: string; source: "customer" | "lender" } | null>(null);
@@ -310,6 +311,9 @@ export default function LedgerTable({ rows: initial, options, locations }: {
     if (numSort) return [...kept].sort((a, b) => (numSort === "asc" ? a.number - b.number : b.number - a.number));
     return viewDef.sort ? [...kept].sort(viewDef.sort) : [...kept].sort((a, b) => b.number - a.number);
   })();
+  // Totals leave cancelled deals out, like every other screen; they still show as rows.
+  const totalRows = viewRows.filter((r) => r.stage !== "cancelled");
+  const cancelledShown = viewRows.length - totalRows.length;
   // What the # header arrow shows; null when the view is in its own (non-number) order.
   const numDir: NumSort = numSort ?? (viewDef.sort ? null : "desc");
   const flipNumSort = () => {
@@ -471,7 +475,7 @@ export default function LedgerTable({ rows: initial, options, locations }: {
                 {shown.map((c) => {
                   const isC = collapsed.has(c.key);
                   const p = pin(c.key);
-                  const content = isC ? null : c.key === "number" ? viewRows.length : c.key === "stage" || c.key === "daysOut" ? null : c.key === "customer" ? "deals" : c.field && !c.num ? null : c.total?.(viewRows);
+                  const content = isC ? null : c.key === "number" ? totalRows.length : c.key === "stage" || c.key === "daysOut" ? null : c.key === "customer" ? (cancelledShown ? `deals (${cancelledShown} cancelled not counted)` : "deals") : c.field && !c.num ? null : c.total?.(totalRows);
                   return (
                     <td key={c.key} className={`${c.num ? "num" : ""} ${p.cls} ${isC ? "col-collapsed" : ""}`} style={p.style}>
                       {content}
@@ -745,7 +749,7 @@ function StageModal({ deal, onClose, save }: { deal: DerivedDeal; onClose: () =>
         </p>
         {cancelled ? (
           <>
-            <p>Cancelled{deal.cancelledAt ? ` ${shortDate(deal.cancelledAt.slice(0, 10))}` : ""}: {deal.cancelReason ?? "no reason recorded"}</p>
+            <p>Cancelled{deal.cancelledAt ? ` ${new Date(deal.cancelledAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" })}` : ""}: {deal.cancelReason ?? "no reason recorded"}</p>
             <p className="muted">Restoring puts it back in the ledger, sets its products aside again and brings back its commissions.</p>
           </>
         ) : (

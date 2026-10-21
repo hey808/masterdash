@@ -6,12 +6,15 @@
 import { z } from "zod";
 import { tx } from "../db";
 import { todayET } from "../dates";
-import { derive } from "./derive";
+import { SETTLED_CENTS, derive } from "./derive";
 import { EditError } from "./edit";
 import { loadDeal } from "./repo";
 import type { DerivedDeal } from "./types";
 
-const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2026-10-23");
+const date = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2026-10-23")
+  .refine((d) => d >= "2000-01-01" && d <= "2099-12-31" && !Number.isNaN(Date.parse(`${d}T00:00:00Z`)), "That date doesn't look right");
 const uuid = z.string().uuid();
 
 export const NewPayout = z.object({
@@ -22,7 +25,7 @@ export const NewPayout = z.object({
   paidOn: date,
   method: z.string().max(40).nullable().optional(),
   /** The Friday pay run this pays; omitted = go by paidOn. */
-  payRun: date.nullable().optional(),
+  payRun: date.refine((d) => new Date(`${d}T12:00:00Z`).getUTCDay() === 5, "Pay runs are on Fridays").nullable().optional(),
 });
 
 export const NewPayment = z.object({
@@ -42,14 +45,42 @@ async function derivedDeal(id: string, c: Parameters<typeof loadDeal>[1]): Promi
   return derive(d, todayET());
 }
 
+const KIND_WORD: Record<string, string> = { closer: "closer", override: "manager", setter: "setter", canvasser: "canvasser", installer: "installer" };
+const usd = (c: number) => `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/**
+ * Guard for every payout write: the deal is locked, live, the person is the one in that role,
+ * and the amount isn't more than is still owed (earned − paid). Stops double payments from a
+ * double click, two open tabs, or a stale page.
+ */
+export async function assertPayoutFits(
+  c: Parameters<typeof loadDeal>[1],
+  v: { dealId: string; kind: string; personId: string | null; amountCents: number },
+): Promise<void> {
+  const lock = await c!.query("select number, cancelled_at from deals where id = $1 for update", [v.dealId]);
+  const row = lock.rows[0];
+  if (!row) throw new EditError("That deal no longer exists. Reload and try again.", 404);
+  if (row.cancelled_at) throw new EditError(`Deal #${row.number} is cancelled; nothing is owed on it.`, 400);
+  const d = await derivedDeal(v.dealId, c);
+  const pos = d.payoutPositions.find((p) => p.kind === v.kind);
+  if (!pos || !pos.person) throw new EditError(`Deal #${row.number} has no ${KIND_WORD[v.kind] ?? v.kind} to pay.`, 400);
+  if (pos.person.id !== v.personId) throw new EditError(`${pos.person.name} is the ${KIND_WORD[v.kind] ?? v.kind} on deal #${row.number}, not the person picked.`, 400);
+  if (v.amountCents > pos.openCents + SETTLED_CENTS) {
+    throw new EditError(
+      pos.openCents <= SETTLED_CENTS
+        ? `${pos.person.name} is already paid in full on deal #${row.number}. Reload to see the latest.`
+        : `Deal #${row.number}: only ${usd(pos.openCents)} is still owed to ${pos.person.name}.`,
+      409,
+    );
+  }
+}
+
 export async function recordPayout(input: unknown, actor: string): Promise<{ id: string }> {
   const p = NewPayout.safeParse(input);
   if (!p.success) throw new EditError(first(p.error), 400);
   const v = p.data;
   return tx(actor, async (c) => {
-    const deal = await c.query("select cancelled_at from deals where id = $1", [v.dealId]);
-    if (!deal.rowCount) throw new EditError("That deal no longer exists.", 404);
-    if (deal.rows[0].cancelled_at) throw new EditError("That deal is cancelled; nothing is owed on it.", 400);
+    await assertPayoutFits(c, v);
     const { rows } = await c.query(
       "insert into payouts (deal_id, person_id, kind, amount_cents, paid_on, method, pay_run) values ($1,$2,$3,$4,$5,$6,$7) returning id",
       [v.dealId, v.personId, v.kind, v.amountCents, v.paidOn, v.method ?? null, v.payRun ?? null],

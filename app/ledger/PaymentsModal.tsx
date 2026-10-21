@@ -14,6 +14,16 @@ export default function PaymentsModal({ deal, initialSource, onClose, onDeal }: 
   const [source, setSource] = useState<"customer" | "lender">(initialSource ?? (deal.cashDueCents > 50 || deal.financedPortionCents === 0 ? "customer" : "lender"));
   const suggested = source === "customer" ? Math.max(0, deal.cashDueCents) : Math.max(0, deal.fundingDueCents);
 
+  function saveDate(id: string | undefined, was: string | null, el: HTMLInputElement) {
+    const v = el.value;
+    if (!id || v === (was ?? "")) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || v < "2000-01-01" || v > todayET()) {
+      el.value = was ?? "";
+      return;
+    }
+    void call(`/api/payments/${id}`, "PATCH", { receivedOn: v });
+  }
+
   async function call(url: string, method: string, payload?: unknown) {
     setBusy(true);
     setError(null);
@@ -74,7 +84,9 @@ export default function PaymentsModal({ deal, initialSource, onClose, onDeal }: 
                     className="date-inline"
                     defaultValue={p.receivedOn ?? ""}
                     disabled={busy}
-                    onChange={(e) => e.target.value && p.id && call(`/api/payments/${p.id}`, "PATCH", { receivedOn: e.target.value })}
+                    // Save when the field is left (or Enter), not on every keystroke: typing a year passes through 0002, 0020…
+                    onBlur={(e) => saveDate(p.id, p.receivedOn, e.currentTarget)}
+                    onKeyDown={(e) => e.key === "Enter" && saveDate(p.id, p.receivedOn, e.currentTarget)}
                   />
                   {!p.receivedOn && <span className="hint">imported, no date</span>}
                 </td>

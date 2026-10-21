@@ -111,11 +111,12 @@ describe.skipIf(!url)("payout form (database)", () => {
 
   it("records one payment split across deals, and refuses the wrong person", async () => {
     const { submitPayouts } = await import("./forms");
-    const { rows } = await db().query(
-      `select d.id, d.closer_id, d.installer_id from deals d where d.cancelled_at is null and d.closer_id is not null and d.installer_id is not null
-         and d.closer_id <> d.installer_id order by d.number limit 2`,
+    // Deals where the closer is still owed more than this payout, so it fits.
+    const { loadLedger } = await import("./ledger/repo");
+    const open = (await loadLedger("2026-10-20")).filter(
+      (d) => d.stage !== "cancelled" && d.installer && d.closer && d.installer.id !== d.closer.id && (d.payoutPositions.find((p) => p.kind === "closer")?.openCents ?? 0) > 20000,
     );
-    const [a, b] = rows as Array<{ id: string; closer_id: string; installer_id: string }>;
+    const [a, b] = open.map((d) => ({ id: d.id, closer_id: d.closer!.id, installer_id: d.installer!.id }));
     const before = (await loadDeal(a!.id))!.payouts.length;
     const res = await submitPayouts({
       payRun: "2026-10-23", paidOn: "2026-10-20",
@@ -139,6 +140,14 @@ describe.skipIf(!url)("payout form (database)", () => {
       }),
     ).rejects.toThrow(/isn't the closer/);
     expect(await count()).toBe(n0);
+    // Can't pay more than is still owed (a double click / stale tab).
+    await expect(
+      submitPayouts({ payRun: "2026-10-23", paidOn: "2026-10-20", payees: [{ personId: a!.closer_id, method: "zelle", lines: [{ dealId: a!.id, kind: "closer", amountCents: 999_999_00 }] }] }),
+    ).rejects.toThrow(/still owed|paid in full/);
+    // The pay run screen's single payout has the same guard, including who it's paid to.
+    const { recordPayout } = await import("./ledger/money-events");
+    await expect(recordPayout({ dealId: a!.id, kind: "closer", personId: a!.installer_id, amountCents: 100, paidOn: "2026-10-20" }, "test")).rejects.toThrow(/not the person picked/);
+    await expect(recordPayout({ dealId: a!.id, kind: "closer", personId: a!.closer_id, amountCents: 100, paidOn: "2026-10-20", payRun: "2026-10-22" }, "test")).rejects.toThrow(/Fridays/);
     await expect(submitPayouts({ payRun: "2026-10-22", paidOn: "2026-10-20", payees: [{ personId: a!.closer_id, method: "zelle", lines: [{ dealId: a!.id, kind: "closer", amountCents: 1 }] }] })).rejects.toThrow(/Fridays/);
     const sub = await db().query("select kind, payload->>'totalCents' t from form_submissions where kind = 'payout' order by created_at desc limit 1");
     expect(sub.rows[0]).toEqual({ kind: "payout", t: "12345" });

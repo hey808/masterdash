@@ -80,15 +80,27 @@ export async function applyEdit(
         return set(`${def.column} = $2`, [v === "" ? null : v]);
 
       case "money": {
+        // Cash + financed must equal the price, so the split moves together:
+        //   price     → all-financed deals stay all-financed; otherwise financed stays and cash absorbs the change
+        //   financed  → cash = price − financed
+        //   cash      → financed = price − cash
+        const n = v as number;
+        const price = cur.price_cents;
         if (key === "priceCents") {
-          // A deal that is all cash or all financed keeps its shape when the price changes.
-          const price = v as number;
-          const allCash = cur.financed_portion_cents === 0 && cur.cash_portion_cents === cur.price_cents;
-          const allFin = cur.cash_portion_cents === 0 && cur.financed_portion_cents === cur.price_cents;
-          if (allCash) return set("price_cents = $2, cash_portion_cents = $2", [price]);
-          if (allFin) return set("price_cents = $2, financed_portion_cents = $2", [price]);
+          const allFin = cur.cash_portion_cents === 0 && cur.financed_portion_cents === price;
+          if (allFin) return set("price_cents = $2, financed_portion_cents = $2", [n]);
+          if (n < cur.financed_portion_cents) throw new EditError("The price can't be less than the financed amount. Lower the financed amount first.", 400);
+          return set("price_cents = $2, cash_portion_cents = $2 - financed_portion_cents", [n]);
         }
-        return set(`${def.column} = $2`, [v]);
+        if (key === "financedPortionCents") {
+          if (n > price) throw new EditError("Financed can't be more than the price.", 400);
+          return set("financed_portion_cents = $2, cash_portion_cents = price_cents - $2", [n]);
+        }
+        if (key === "cashPortionCents") {
+          if (n > price) throw new EditError("Cash can't be more than the price.", 400);
+          return set("cash_portion_cents = $2, financed_portion_cents = price_cents - $2", [n]);
+        }
+        return set(`${def.column} = $2`, [n]);
       }
 
       case "rate":

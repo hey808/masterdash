@@ -5,6 +5,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { closeDb, db } from "../db";
 import { EditError, applyEdit } from "./edit";
+import { loadDeal } from "./repo";
 
 const url = process.env.TEST_DATABASE_URL;
 
@@ -44,13 +45,29 @@ describe.skipIf(!url)("applyEdit (database)", () => {
   });
 
   it("turns a constraint violation into a plain message", async () => {
+    // Moving a cash deal's money to financing with no lender on it breaks the lender rule.
     const err = await applyEdit(cashDeal.id, "cashPortionCents", 1, cashDeal.version, "test:edit").catch((e) => e);
     expect(err.status).toBe(400);
-    expect(err.message).toMatch(/has to equal the price/);
+    expect(err.message).toMatch(/lender/i);
+  });
+
+  it("keeps cash + financed = price when either side or the price is edited", async () => {
+    const cur = (await loadDeal(finDeal.id))!;
+    const price = cur.priceCents;
+    let d = await applyEdit(finDeal.id, "cashPortionCents", 100000, cur.version, "test:edit");
+    expect([d.cashPortionCents, d.financedPortionCents]).toEqual([100000, price - 100000]);
+    d = await applyEdit(finDeal.id, "financedPortionCents", price - 50000, d.version, "test:edit");
+    expect([d.cashPortionCents, d.financedPortionCents]).toEqual([50000, price - 50000]);
+    // Mixed deal: a new price keeps the financed amount and moves cash.
+    d = await applyEdit(finDeal.id, "priceCents", price + 20000, d.version, "test:edit");
+    expect([d.priceCents, d.cashPortionCents, d.financedPortionCents]).toEqual([price + 20000, 70000, price - 50000]);
+    const err = await applyEdit(finDeal.id, "financedPortionCents", price + 999999, d.version, "test:edit").catch((e) => e);
+    expect(err.message).toMatch(/more than the price/);
   });
 
   it("replaces products and snapshots each SKU's cost on the sale date", async () => {
-    const d = await applyEdit(finDeal.id, "products", [{ skuCode: "PWF", qty: 1 }, { skuCode: "RO", qty: 2 }], finDeal.version, "test:edit");
+    const fresh = (await loadDeal(finDeal.id))!;
+    const d = await applyEdit(finDeal.id, "products", [{ skuCode: "PWF", qty: 1 }, { skuCode: "RO", qty: 2 }], fresh.version, "test:edit");
     expect(d.lines.map((l) => `${l.qty}x${l.skuCode}`).sort()).toEqual(["1xPWF", "2xRO"]);
     expect(d.cogsCents).toBe(d.cogsOverrideCents ?? d.lines.reduce((s, l) => s + l.qty * l.unitCostCents, 0));
   });

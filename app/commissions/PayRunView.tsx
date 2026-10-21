@@ -251,7 +251,15 @@ export default function PayRunView({ run, today, currentPayDate }: { run: PayRun
                   <td>{c.customer}</td>
                   <td>{c.payment.source === "lender" ? "Lender funding" : `Customer (${c.payment.method})`}</td>
                   <td className="num">{money2(c.payment.amountCents)}</td>
-                  <td>{c.completesDeal ? <span className="status payable">Paid in full: commissions unlocked</span> : <span className="muted">partial</span>}</td>
+                  <td>
+                    {c.unlocksCommissions ? (
+                      <span className="status payable">Paid in full: commissions unlocked</span>
+                    ) : c.completesDeal ? (
+                      <span className="status waiting">Paid in full: waiting on install</span>
+                    ) : (
+                      <span className="muted">partial</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

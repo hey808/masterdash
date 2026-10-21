@@ -85,7 +85,7 @@ export default function BankView({ txns, categories, balances }: { txns: BankTxn
         </div>
         <div className="stat">
           <div className="label">Statements through</div>
-          <div className="value">{balances[0]?.lastOn ? shortDate(balances[0].lastOn) : "—"}</div>
+          <div className="value">{(() => { const last = balances.map((b) => b.lastOn).filter((d): d is string => !!d).sort().at(-1); return last ? shortDate(last) : "—"; })()}</div>
         </div>
       </div>
 

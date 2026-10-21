@@ -678,3 +678,15 @@ table.statement td.neg-paren { color: #b0102a; }
 .seg { gap: 2px; padding: 3px; border: 0; border-radius: 999px; background: #e3ecf8; }
 .seg button { border-radius: 999px; background: transparent; color: #3d5175; font-weight: 600; padding: 6px 14px; }
 .seg button.on { background: #fff; color: var(--navy); box-shadow: 0 1px 3px rgba(5, 44, 111, 0.16); }
+.field-form .payee-head select { width: auto; }
+.field-form .payee-head input.ref { width: 140px; }
+.payees, .payee, .payee-head { min-width: 0; }
+@media (max-width: 760px) {
+  .payee-head { grid-template-columns: minmax(0, 1fr) auto; }
+  .field-form .payee-head select, .field-form .payee-head input.ref { width: 100%; }
+  .payee-head select { grid-column: 1; }
+  .payee-head input.ref { grid-column: 2; width: 120px; }
+  .payout-bar { gap: 10px; padding: 10px 12px; font-size: 13px; }
+  .payout-bar-total { font-size: 17px; }
+  .payout-bar .btn-primary.big { padding: 10px 16px; font-size: 14px; }
+}

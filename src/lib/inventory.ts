@@ -8,6 +8,7 @@
  *
  * A unit leaves the warehouse when the installer form marks its job installed.
  */
+import type pg from "pg";
 import { z } from "zod";
 import { db, tx } from "./db";
 import { todayET } from "./dates";
@@ -42,9 +43,9 @@ export function stockStatus(available: number, onOrder: number, weeklyUse: numbe
 }
 
 /** One location's stock, or every location combined when locationSlug is null. */
-export async function loadStock(locationSlug: string | null, today = todayET()): Promise<StockRow[]> {
+export async function loadStock(locationSlug: string | null, today = todayET(), client: Pick<pg.Pool, "query"> = db()): Promise<StockRow[]> {
   const since = addDays(today, -28);
-  const { rows } = await db().query(
+  const { rows } = await client.query(
     `with loc as (select id from locations where $1::text is null or slug = $1)
      select s.code, s.name,
        coalesce(sku_cost_on(s.code, $2::date), 0) as cost,
@@ -189,16 +190,22 @@ export async function recordCount(input: unknown): Promise<{ delta: number }> {
   const p = CountInput.safeParse(input);
   if (!p.success) throw new EditError(first(p.error), 400);
   const v = p.data;
-  const row = (await loadStock(v.location)).find((r) => r.skuCode === v.skuCode);
-  if (!row) throw new EditError("Unknown product.", 400);
-  const delta = v.countedQty - row.onHand;
-  if (delta === 0) return { delta };
-  await tx("web:inventory", async (c) => {
+  if (v.countedOn > todayET()) throw new EditError("A count can't be dated in the future.", 400);
+  return tx("web:inventory", async (c) => {
     const loc = (await c.query("select id from locations where slug = $1", [v.location])).rows[0];
-    await c.query(
-      "insert into inventory_adjustments (location_id, sku_code, qty_delta, reason, adjusted_on, note) values ($1,$2,$3,'count',$4,$5)",
-      [loc.id, v.skuCode, delta, v.countedOn, v.note ?? `Shelf count: ${v.countedQty}`],
-    );
+    if (!loc) throw new EditError("Unknown location.", 400);
+    // One count per shelf at a time, and the difference is taken inside the same transaction,
+    // so a sale or install landing at the same moment can't skew it.
+    await c.query("select pg_advisory_xact_lock(hashtext($1))", [`count:${v.location}:${v.skuCode}`]);
+    const row = (await loadStock(v.location, todayET(), c)).find((r) => r.skuCode === v.skuCode);
+    if (!row) throw new EditError("Unknown product.", 400);
+    const delta = v.countedQty - row.onHand;
+    if (delta !== 0) {
+      await c.query(
+        "insert into inventory_adjustments (location_id, sku_code, qty_delta, reason, adjusted_on, note) values ($1,$2,$3,'count',$4,$5)",
+        [loc.id, v.skuCode, delta, v.countedOn, v.note ?? `Shelf count: ${v.countedQty}`],
+      );
+    }
+    return { delta };
   });
-  return { delta };
 }
