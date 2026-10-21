@@ -771,3 +771,7 @@ table.statement td.neg-paren { color: #b0102a; }
   .cal-weeknav { margin-left: 0; }
 }
 .cal-more-link { display: block; margin: 8px 2px 0; font-size: 12.5px; font-weight: 600; }
+/* Top nav: links (Home) and dropdown buttons share one box so they line up exactly */
+.topbar nav.mainnav { align-items: center; }
+.mainnav .navgroup { display: flex; align-items: center; }
+.mainnav .navtop { box-sizing: border-box; height: 38px; line-height: 1; margin: 0; vertical-align: middle; font-family: var(--font-body); -webkit-appearance: none; appearance: none; }
