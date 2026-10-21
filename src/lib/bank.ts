@@ -189,10 +189,15 @@ export async function importBankCsv(input: unknown, actor = "web:bank"): Promise
     const importId: string = imp.rows[0].id;
     const batch = lines.map((l, i) => {
       const rule = matchRule(l, rules);
+      // Every deposit is revenue unless a rule says otherwise (e.g. lender funding).
+      const inflowDefault = !rule && l.amountCents > 0;
       return {
         fingerprint: prints[i], posted_on: l.postedOn, txn_on: l.txnOn, txn_type: l.txnType, check_no: l.checkNo,
         description: l.description, merchant: l.merchant, bank_category: l.bankCategory, amount_cents: l.amountCents,
-        balance_cents: l.balanceCents, category: rule?.category ?? "uncategorized", rule_id: rule?.id ?? null, needs_review: rule ? rule.needsReview : true,
+        balance_cents: l.balanceCents,
+        category: rule?.category ?? (inflowDefault ? "customer_payments" : "uncategorized"),
+        rule_id: rule?.id ?? null,
+        needs_review: rule ? rule.needsReview : !inflowDefault,
       };
     });
     // One statement for the whole file; existing fingerprints (overlapping statements) are skipped.
