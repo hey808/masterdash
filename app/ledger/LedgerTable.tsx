@@ -504,7 +504,16 @@ export default function LedgerTable({ rows: initial, options, locations }: {
         {viewRows.length === 0 && <p className="empty">No deals in this view.</p>}
       </div>
       {stageFor && rows.find((r) => r.id === stageFor) && (
-        <StageModal deal={rows.find((r) => r.id === stageFor)!} onClose={closeStage} save={save} />
+        <StageModal
+          deal={rows.find((r) => r.id === stageFor)!}
+          onClose={closeStage}
+          save={save}
+          onDeleted={(id, label) => {
+            setRows((rs) => rs.filter((r) => r.id !== id));
+            setStageFor(null);
+            setFlash(`Deleted ${label}.`);
+          }}
+        />
       )}
       {paymentsFor && rows.find((r) => r.id === paymentsFor.id) && (
         <PaymentsModal deal={rows.find((r) => r.id === paymentsFor.id)!} initialSource={paymentsFor.source} onClose={closePayments} onDeal={replaceRow} />
@@ -747,7 +756,12 @@ function ProductsEditor(props: {
 }
 
 /** Cancel a deal (with a reason) or bring a cancelled one back. Other stages follow from installs and money. */
-function StageModal({ deal, onClose, save }: { deal: DerivedDeal; onClose: () => void; save: (row: DerivedDeal, field: FieldKey, value: unknown) => Promise<SaveResult> }) {
+function StageModal({ deal, onClose, save, onDeleted }: {
+  deal: DerivedDeal;
+  onClose: () => void;
+  save: (row: DerivedDeal, field: FieldKey, value: unknown) => Promise<SaveResult>;
+  onDeleted: (id: string, label: string) => void;
+}) {
   const cancelled = deal.stage === "cancelled";
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -796,6 +810,75 @@ function StageModal({ deal, onClose, save }: { deal: DerivedDeal; onClose: () =>
           <button type="button" className="linkbtn" onClick={onClose}>Close</button>
         </div>
       </form>
+      <DeleteDeal deal={deal} onDeleted={onDeleted} />
     </Modal>
+  );
+}
+
+interface Impact { number: number; customer: string; payments: number; paymentsCents: number; payouts: number; payoutsCents: number; products: number; agreements: number; forms: number; installed: boolean }
+
+/** Permanent delete, behind a typed confirmation. Cancelling is the usual answer; this is for deals that shouldn't exist. */
+function DeleteDeal({ deal, onDeleted }: { deal: DerivedDeal; onDeleted: (id: string, label: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [impact, setImpact] = useState<Impact | null>(null);
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open || impact) return;
+    fetch(`/api/deals/${deal.id}?impact=1`).then(async (r) => (r.ok ? setImpact(await r.json()) : setError(((await r.json().catch(() => ({}))) as { error?: string }).error ?? "Couldn't check the deal.")));
+  }, [open, impact, deal.id]);
+  if (!open) {
+    return (
+      <div className="del-deal">
+        <button type="button" className="linkbtn danger" onClick={() => setOpen(true)}>Delete this deal permanently…</button>
+      </div>
+    );
+  }
+  const goes: string[] = [];
+  if (impact) {
+    if (impact.payments) goes.push(`${impact.payments} payment${impact.payments === 1 ? "" : "s"} (${fmt(impact.paymentsCents, { decimals: 2 })})`);
+    if (impact.payouts) goes.push(`${impact.payouts} payout${impact.payouts === 1 ? "" : "s"} (${fmt(impact.payoutsCents, { decimals: 2 })})`);
+    if (impact.products) goes.push(`${impact.products} product${impact.products === 1 ? "" : "s"}`);
+  }
+  return (
+    <div className="del-deal open">
+      <strong>Delete #{deal.number} permanently</strong>
+      <p className="muted small">This can&apos;t be undone. If the sale just fell through, cancel it instead: that keeps the history and can be restored.</p>
+      {!impact && !error && <p className="muted small">Checking what&apos;s attached…</p>}
+      {impact && (
+        <ul className="small">
+          <li>{goes.length ? <>Also deleted: {goes.join(", ")}.</> : "Nothing else is attached."}</li>
+          {(impact.forms > 0 || impact.agreements > 0) && (
+            <li>Kept, unlinked: {[impact.forms ? `${impact.forms} form submission${impact.forms === 1 ? "" : "s"}` : null, impact.agreements ? `${impact.agreements} customer agreement${impact.agreements === 1 ? "" : "s"}` : null].filter(Boolean).join(" and ")}.</li>
+          )}
+          {impact.installed && impact.products > 0 && <li>It&apos;s marked installed, so its {impact.products === 1 ? "unit goes" : `${impact.products} units go`} back into the warehouse count.</li>}
+          {impact.payouts > 0 && <li>Commissions already paid on it will no longer show on anyone&apos;s commissions.</li>}
+        </ul>
+      )}
+      <label className="small"><span>Type <b>{deal.number}</b> to confirm</span>
+        <input inputMode="numeric" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={String(deal.number)} autoComplete="off" />
+      </label>
+      {error && <p className="flash">{error}</p>}
+      <div className="products-actions">
+        <button
+          type="button"
+          className="btn-danger"
+          disabled={busy || !impact || typed.replace(/[#\s]/g, "") !== String(deal.number)}
+          onClick={async () => {
+            setBusy(true);
+            setError(null);
+            const res = await fetch(`/api/deals/${deal.id}`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirm: typed }) }).catch(() => null);
+            setBusy(false);
+            const b = (await res?.json().catch(() => ({}))) as { error?: string } | undefined;
+            if (!res?.ok) return setError(b?.error ?? "Couldn't delete it.");
+            onDeleted(deal.id, `#${deal.number} ${deal.customerName}`);
+          }}
+        >
+          {busy ? "Deleting…" : "Delete permanently"}
+        </button>
+        <button type="button" className="linkbtn" onClick={() => { setOpen(false); setTyped(""); }}>Keep it</button>
+      </div>
+    </div>
   );
 }

@@ -1301,3 +1301,10 @@ td:hover .name-edit, .name-edit:focus-visible { opacity: 1; }
 .th-sort { display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; padding: 0; font: inherit; color: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; }
 .th-sort:hover { color: var(--navy); }
 .th-sort span { font-size: 9px; color: var(--blue); }
+.del-deal { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.del-deal.open { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid #f3b6be; border-radius: 12px; background: #fff7f8; }
+.del-deal.open strong { color: #b10a1f; }
+.del-deal ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.del-deal label { display: grid; gap: 4px; }
+.del-deal input { padding: 8px 10px; border: 1px solid var(--line-2); border-radius: 8px; font: inherit; max-width: 160px; }
+.del-deal p { margin: 0; }
