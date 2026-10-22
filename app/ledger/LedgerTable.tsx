@@ -11,6 +11,7 @@ import { FIELDS, parseMoneyInput, parseRateInput, type FieldDef, type FieldKey }
 import type { LedgerOptions } from "@/lib/ledger/options";
 import { STAGE_LABEL, type DealLine, type DerivedDeal } from "@/lib/ledger/types";
 import { fmt, fmtRate, sumCents } from "@/lib/money";
+import { csvField } from "@/lib/bank-export";
 
 /* ── Columns ─────────────────────────────────────────────────────────── */
 
@@ -25,6 +26,8 @@ type Col = {
   cell: (r: DerivedDeal) => ReactNode;
   cellClass?: (r: DerivedDeal) => string;
   total?: (rows: DerivedDeal[]) => ReactNode;
+  /** CSV value when the on-screen cell isn't plain text (dates as yyyy-mm-dd, money as dollars). */
+  csv?: (r: DerivedDeal) => string | number | null;
 };
 
 /** Total still owed by the customer and the lender (over-funding counts as 0). */
@@ -39,14 +42,22 @@ const sum = (pick: (r: DerivedDeal) => number) => (rows: DerivedDeal[]) => fmt(s
 const money = (pick: (r: DerivedDeal) => number | null, totalPick?: (r: DerivedDeal) => number) => ({
   num: true,
   cell: (r: DerivedDeal) => fmt(pick(r)),
+  csv: (r: DerivedDeal) => { const v = pick(r); return v == null ? null : v / 100; },
   total: sum(totalPick ?? ((r) => pick(r) ?? 0)),
 });
+/** Sold date as m/d/yy, short enough for the pinned column. */
+const soldDate = (d: string) => {
+  const [y, m, day] = d.split("-");
+  return y && m && day ? `${Number(m)}/${Number(day)}/${y.slice(2)}` : d;
+};
+const bySold = (a: DerivedDeal, b: DerivedDeal) => (a.saleDate < b.saleDate ? -1 : a.saleDate > b.saleDate ? 1 : a.number - b.number);
 const LOCATION_NAME: Record<string, string> = { wilmington: "Wilmington", "myrtle-beach": "Myrtle Beach" };
 const productsText = (lines: DealLine[]) => lines.map((l) => (l.qty > 1 ? `${l.qty}× ${l.skuCode}` : l.skuCode)).join(" + ");
 
 const COLUMNS: Col[] = [
-  { key: "number", label: "#", fixed: true, cell: (r) => r.number, cellClass: () => "muted" },
-  { key: "stage", label: "Stage", fixed: true, cell: (r) => <span className={`stage ${r.stage}`}>{STAGE_LABEL[r.stage]}</span> },
+  // The left column is the sold date (the deal number still shows on the deal's popups).
+  { key: "number", label: "Sold", fixed: true, field: "saleDate", cell: (r) => soldDate(r.saleDate), csv: (r) => r.saleDate, cellClass: () => "muted" },
+  { key: "stage", label: "Stage", fixed: true, cell: (r) => <span className={`stage ${r.stage}`}>{STAGE_LABEL[r.stage]}</span>, csv: (r) => STAGE_LABEL[r.stage] },
   { key: "customer", label: "Customer", fixed: true, field: "customerName", cell: (r) => r.customerName, cellClass: () => "customer" },
   { key: "address", label: "Address", field: "customerAddress", cell: (r) => r.customerAddress ?? "" },
   { key: "location", label: "Location", field: "location", cell: (r) => LOCATION_NAME[r.location] ?? r.location },
@@ -54,8 +65,7 @@ const COLUMNS: Col[] = [
   { key: "closer", label: "Closer", field: "closer", cell: (r) => r.closer?.name ?? "" },
   { key: "setter", label: "Setter", field: "setter", cell: (r) => r.setter?.name ?? "" },
   { key: "manager", label: "Manager", field: "manager", cell: (r) => r.manager?.name ?? "" },
-  { key: "sold", label: "Sold Date", field: "saleDate", cell: (r) => shortDate(r.saleDate) },
-  { key: "products", label: "Products", field: "products", cell: (r) => productsText(r.lines) || <span className="muted">none</span> },
+  { key: "products", label: "Products", field: "products", cell: (r) => productsText(r.lines) || <span className="muted">none</span>, csv: (r) => productsText(r.lines) },
   { key: "soap", label: "Soap", field: "soap", cell: (r) => (r.soap ? "Yes" : "No") },
   { key: "arr", label: "Maintenance (ARR)", field: "maintenanceArrCents", ...money((r) => r.maintenanceArrCents) },
   { key: "price", label: "Price", field: "priceCents", ...money((r) => r.priceCents) },
@@ -76,20 +86,21 @@ const COLUMNS: Col[] = [
     ...money(outstanding),
     cellClass: (r) => (outstanding(r) > 50 ? "owed" : ""),
   },
-  { key: "commissionRate", label: "Commission %", field: "commissionRate", num: true, cell: (r) => fmtRate(r.commissionRate) },
-  { key: "managerRate", label: "Override %", field: "managerRate", num: true, cell: (r) => fmtRate(r.managerRate) },
+  { key: "commissionRate", label: "Commission %", field: "commissionRate", num: true, cell: (r) => fmtRate(r.commissionRate), csv: (r) => (r.commissionRate == null ? null : r.commissionRate * 100) },
+  { key: "managerRate", label: "Override %", field: "managerRate", num: true, cell: (r) => fmtRate(r.managerRate), csv: (r) => (r.managerRate == null ? null : r.managerRate * 100) },
   { key: "adminFee", label: "Admin Fee", field: "adminFeeCents", ...money((r) => r.adminFeeCents) },
   { key: "extras", label: "Extras", field: "extrasCents", ...money((r) => r.extrasCents) },
   { key: "payouts", label: "Payouts Open", ...money(openPayouts) },
   { key: "installer", label: "Installer", field: "installer", cell: (r) => r.installer?.name ?? "" },
   { key: "installerPay", label: "Installer Pay", field: "installerPayCents", ...money((r) => r.installerPayCents) },
-  { key: "scheduled", label: "Install Schedule", field: "installScheduledOn", cell: (r) => (r.installScheduledOn ? shortDate(r.installScheduledOn) : "") },
-  { key: "installed", label: "Installed", field: "installed", cell: (r) => (r.installedOn ? "Yes" : "No") },
+  { key: "scheduled", label: "Install Schedule", field: "installScheduledOn", cell: (r) => (r.installScheduledOn ? shortDate(r.installScheduledOn) : ""), csv: (r) => r.installScheduledOn },
+  { key: "installed", label: "Installed", field: "installed", cell: (r) => (r.installedOn ? "Yes" : "No"), csv: (r) => r.installedOn ?? "No" },
   {
     key: "daysOut",
     label: "Days Since Install",
     num: true,
     cell: (r) => daysSince(r.installedOn) ?? "—",
+    csv: (r) => daysSince(r.installedOn),
     cellClass: (r) => {
       const d = daysSince(r.installedOn);
       return d == null || outstanding(r) <= 50 ? "" : d > 60 ? "age-bad" : d > 30 ? "age-warn" : "";
@@ -97,15 +108,27 @@ const COLUMNS: Col[] = [
   },
   { key: "cogs", label: "Cost of Goods", ...money((r) => r.cogsCents) },
   { key: "profit", label: "Net Profit", ...money((r) => r.netProfitCents), cellClass: (r) => ((r.netProfitCents ?? 0) < 0 ? "neg" : "") },
-  { key: "margin", label: "Margin", num: true, cell: (r) => (r.margin == null ? "—" : `${(r.margin * 100).toFixed(1)}%`) },
-  { key: "done", label: "Done", field: "closed", cell: (r) => (r.closedAt ? "✓" : "") },
+  { key: "margin", label: "Margin", num: true, cell: (r) => (r.margin == null ? "—" : `${(r.margin * 100).toFixed(1)}%`), csv: (r) => (r.margin == null ? null : Math.round(r.margin * 1000) / 10) },
+  { key: "done", label: "Done", field: "closed", cell: (r) => (r.closedAt ? "✓" : ""), csv: (r) => (r.closedAt ? r.closedAt.slice(0, 10) : "") },
   { key: "note", label: "Note", field: "note", cell: (r) => r.note ?? "", cellClass: () => "wrap" },
   { key: "issues", label: "Issues", cell: (r) => r.issues.join(" · "), cellClass: () => "issues" },
 ];
 
+/** Every column (shown or not) for the rows in view, plus the deal number. Money in dollars, dates yyyy-mm-dd. */
+function ledgerCsv(rows: DerivedDeal[]): string {
+  const value = (c: Col, r: DerivedDeal) => {
+    if (c.csv) return c.csv(r);
+    const v = c.cell(r);
+    return typeof v === "string" || typeof v === "number" ? v : null;
+  };
+  const head = ["Deal #", ...COLUMNS.map((c) => (c.key === "number" ? "Sold Date" : c.label))];
+  const lines = rows.map((r) => [r.number, ...COLUMNS.map((c) => value(c, r))].map(csvField).join(","));
+  return [head.map(csvField).join(","), ...lines].join("\r\n") + "\r\n";
+}
+
 /** Column views. Each view starts from its preset; tweaks are remembered per view in this browser. */
-const CONSOLIDATED = ["location", "sold", "soap", "arr", "price", "cash", "card", "financed", "lenderFee", "cardFee", "collectedCustomer", "collectedLender", "outstanding", "scheduled", "installed", "profit"];
-const RECEIVABLES = ["location", "closer", "sold", "lender", "installed", "daysOut", "price", "collectedCustomer", "custOwes", "collectedLender", "lenderOwes", "outstanding"];
+const CONSOLIDATED = ["location", "soap", "arr", "price", "cash", "card", "financed", "lenderFee", "cardFee", "collectedCustomer", "collectedLender", "outstanding", "scheduled", "installed", "profit"];
+const RECEIVABLES = ["location", "closer", "lender", "installed", "daysOut", "price", "collectedCustomer", "custOwes", "collectedLender", "lenderOwes", "outstanding"];
 const only = (keep: string[]) => COLUMNS.filter((c) => !c.fixed && !keep.includes(c.key)).map((c) => c.key);
 
 interface ViewDef {
@@ -134,7 +157,7 @@ const VIEWS: Record<"consolidated" | "receivables" | "all", ViewDef> = {
 type ViewKey = keyof typeof VIEWS;
 const DEFAULT_VIEW: ViewKey = "consolidated";
 const viewStorage = (v: ViewKey) => `ledger.view.${v}.collapsed.v5`; // v5: Soap, Maintenance (ARR); v4: Card, Lender Fee ($), Card Fee columns; v3: Missing + Days Since Install Date columns; v2: Total Outstanding + Collected - Lender in Consolidated
-const NUM_W = 56;
+const NUM_W = 84;
 const STAGE_W = 148;
 const COLLAPSED_W = 28;
 
@@ -322,8 +345,8 @@ export default function LedgerTable({ rows: initial, options, locations }: {
   const viewRows = (() => {
     const inFrame = frameFrom || frameTo ? rows.filter((r) => (!frameFrom || r.saleDate >= frameFrom) && (!frameTo || r.saleDate <= frameTo)) : rows;
     const kept = viewDef.filter ? inFrame.filter(viewDef.filter) : inFrame;
-    if (numSort) return [...kept].sort((a, b) => (numSort === "asc" ? a.number - b.number : b.number - a.number));
-    return viewDef.sort ? [...kept].sort(viewDef.sort) : [...kept].sort((a, b) => b.number - a.number);
+    if (numSort) return [...kept].sort((a, b) => (numSort === "asc" ? bySold(a, b) : bySold(b, a)));
+    return viewDef.sort ? [...kept].sort(viewDef.sort) : [...kept].sort((a, b) => bySold(b, a));
   })();
   // Totals leave cancelled deals out, like every other screen; they still show as rows.
   const totalRows = viewRows.filter((r) => r.stage !== "cancelled");
@@ -393,7 +416,23 @@ export default function LedgerTable({ rows: initial, options, locations }: {
           <button type="button" className="linkbtn" onClick={clearNumSort}>
             Back to {VIEWS[view].label} order
           </button>
-        )}      </div>
+        )}
+        <button
+          type="button"
+          className="linkbtn"
+          title="Download the deals in this view (location, time frame) with every column"
+          onClick={() => {
+            const blob = new Blob(["\ufeff" + ledgerCsv(viewRows)], { type: "text/csv;charset=utf-8" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = `deal-ledger-${VIEWS[view].label.toLowerCase().replace(/\s+/g, "-")}-${todayET()}.csv`;
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+          }}
+        >
+          Export CSV
+        </button>
+      </div>
       {flash && (
         <p className="flash" role="alert">
           {flash} <button type="button" className="linkbtn" onClick={() => setFlash(null)}>Dismiss</button>
@@ -413,10 +452,10 @@ export default function LedgerTable({ rows: initial, options, locations }: {
                         type="button"
                         className="sortbtn"
                         onClick={flipNumSort}
-                        title={numDir === "desc" ? "Newest first. Click for oldest first." : numDir === "asc" ? "Oldest first. Click for newest first." : "Sort by deal number"}
-                        aria-label={`Sort by deal number, ${numDir === "desc" ? "currently newest first" : numDir === "asc" ? "currently oldest first" : "not sorted"}`}
+                        title={numDir === "desc" ? "Newest first. Click for oldest first." : numDir === "asc" ? "Oldest first. Click for newest first." : "Sort by sold date"}
+                        aria-label={`Sort by sold date, ${numDir === "desc" ? "currently newest first" : numDir === "asc" ? "currently oldest first" : "not sorted"}`}
                       >
-                        # <span aria-hidden="true">{numDir === "desc" ? "▼" : numDir === "asc" ? "▲" : "↕"}</span>
+                        Sold <span aria-hidden="true">{numDir === "desc" ? "▼" : numDir === "asc" ? "▲" : "↕"}</span>
                       </button>
                     ) : isC ? (
                       <button type="button" className="colbtn" onClick={() => toggle(c.key)} title={`Show ${c.label}`} aria-label={`Show ${c.label} column`}>+</button>
